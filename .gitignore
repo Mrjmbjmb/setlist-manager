@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+setlists.db
+instance/
+.env
+.venv/
+.idea/
+.DS_Store

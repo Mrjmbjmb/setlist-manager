@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}{{ setlist.name }} · Setlist Manager{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <header>
+        <h2>{{ setlist.name }}</h2>
+        <div class="panel-actions">
+            <form method="post" action="{{ url_for('setlists.delete_setlist', setlist_id=setlist.id) }}" onsubmit="return confirm('Delete this setlist?');">
+                <button type="submit" class="danger">Delete</button>
+            </form>
+        </div>
+    </header>
+    {% if setlist.description %}
+        <p class="setlist-description">{{ setlist.description }}</p>
+    {% endif %}
+    <dl class="setlist-meta">
+        <div>
+            <dt>Total Duration</dt>
+            <dd>{{ setlist.total_duration_label }}</dd>
+        </div>
+        <div>
+            <dt>Target Duration</dt>
+            <dd>{{ setlist.target_duration_label }}</dd>
+        </div>
+        <div>
+            <dt>Songs</dt>
+            <dd>{{ setlist.entries|length }}</dd>
+        </div>
+        <div>
+            <dt>Created</dt>
+            <dd>{{ setlist.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
+        </div>
+    </dl>
+
+    {% if setlist.target_duration_seconds and setlist.entries %}
+        <form method="post" action="{{ url_for('setlists.regenerate_setlist', setlist_id=setlist.id) }}" class="inline-form" onsubmit="return confirm('Regenerate using your target duration? This replaces the current order.');">
+            <button type="submit">Regenerate Automatically</button>
+        </form>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <header>
+        <h3>Order</h3>
+    </header>
+
+    {% if setlist.entries %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Duration</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in setlist.entries %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ entry.song.title }}</td>
+                        <td>{{ entry.song.artist }}</td>
+                        <td>{{ entry.song.duration_label }}</td>
+                        <td class="actions">
+                            <form method="post" action="{{ url_for('setlists.move_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}">
+                                <button type="submit" name="direction" value="up" {% if loop.first %}disabled{% endif %}>↑</button>
+                                <button type="submit" name="direction" value="down" {% if loop.last %}disabled{% endif %}>↓</button>
+                            </form>
+                            <form method="post" action="{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}" onsubmit="return confirm('Remove this song from the setlist?');">
+                                <button type="submit" class="link-button">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No songs in this setlist yet.</p>
+    {% endif %}
+</section>
+
+<section class="panel secondary">
+    <header>
+        <h3>Add Song</h3>
+    </header>
+    {% if available_songs %}
+        <form method="post" action="{{ url_for('setlists.add_song_to_setlist', setlist_id=setlist.id) }}">
+            <label>
+                Song
+                <select name="song_id" required>
+                    <option value="">Choose a song…</option>
+                    {% for song in available_songs %}
+                        <option value="{{ song.id }}">
+                            {{ song.title }} — {{ song.artist }} ({{ song.duration_label }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit">Add To Setlist</button>
+        </form>
+    {% else %}
+        <p>Every song in your library is already in this setlist. <a href="{{ url_for('setlists.songs') }}">Add more songs</a>.</p>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}New Setlist · Setlist Manager{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <header>
+        <h2>Create a Setlist</h2>
+    </header>
+    <form method="post" class="stacked">
+        <label>
+            Name
+            <input type="text" name="name" required>
+        </label>
+        <label>
+            Description
+            <textarea name="description" rows="3" placeholder="Optional notes for the band or show."></textarea>
+        </label>
+        <label>
+            Target Duration (mm:ss or minutes)
+            <input type="text" name="target_duration" placeholder="60 or 60:00">
+        </label>
+        <div class="button-row">
+            <button type="submit" name="action" value="create">Create Empty Setlist</button>
+            <button type="submit" name="action" value="generate" {% if not songs %}disabled{% endif %}>
+                Generate From Library
+            </button>
+        </div>
+        {% if not songs %}
+            <p class="hint">
+                Add songs to your library before generating automatically.
+            </p>
+        {% else %}
+            <p class="hint">
+                Generation picks songs that best fit the target duration without repeats.
+            </p>
+        {% endif %}
+    </form>
+</section>
+
+{% if songs %}
+<section class="panel secondary">
+    <header>
+        <h2>Song Library</h2>
+    </header>
+    <ul class="song-list">
+        {% for song in songs %}
+            <li>{{ song.title }} — {{ song.artist }} ({{ song.duration_label }})</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+{% endblock %}

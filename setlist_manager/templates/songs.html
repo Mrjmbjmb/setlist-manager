@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Songs · Setlist Manager{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <header>
+        <h2>Your Songs</h2>
+    </header>
+
+    {% if songs %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Duration</th>
+                    <th>Genre</th>
+                    <th>Energy</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for song in songs %}
+                    <tr>
+                        <td>{{ song.title }}</td>
+                        <td>{{ song.artist }}</td>
+                        <td>{{ song.duration_label }}</td>
+                        <td>{{ song.genre or '—' }}</td>
+                        <td>{{ song.energy or '—' }}</td>
+                        <td class="actions">
+                            <form method="post" action="{{ url_for('setlists.delete_song', song_id=song.id) }}" onsubmit="return confirm('Remove this song?');">
+                                <button type="submit" class="link-button">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No songs yet. Add some using the form below.</p>
+    {% endif %}
+</section>
+
+<section class="panel secondary">
+    <header>
+        <h2>Add A Song</h2>
+    </header>
+    <form method="post">
+        <label>
+            Title
+            <input type="text" name="title" required>
+        </label>
+        <label>
+            Artist
+            <input type="text" name="artist" required>
+        </label>
+        <label>
+            Duration (mm:ss or minutes)
+            <input type="text" name="duration" placeholder="3:45 or 3.75" required>
+        </label>
+        <label>
+            Genre
+            <input type="text" name="genre" placeholder="Optional">
+        </label>
+        <label>
+            Energy (1-10)
+            <input type="number" name="energy" min="1" max="10" placeholder="Optional">
+        </label>
+        <button type="submit">Save Song</button>
+    </form>
+</section>
+{% endblock %}
