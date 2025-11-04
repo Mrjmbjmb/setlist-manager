@@ -12,6 +12,7 @@
             <a href="{{ url_for('setlists.index') }}">Setlists</a>
             <a href="{{ url_for('setlists.create_setlist') }}">New Setlist</a>
             <a href="{{ url_for('setlists.songs') }}">Songs</a>
+            <a href="{{ url_for('setlists.stats') }}">Stats</a>
         </nav>
     </header>
 
@@ -28,5 +29,6 @@
 
         {% block content %}{% endblock %}
     </main>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

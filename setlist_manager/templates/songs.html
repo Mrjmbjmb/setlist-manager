@@ -13,10 +13,12 @@
             <thead>
                 <tr>
                     <th>Title</th>
+                    <th>Alias</th>
                     <th>Artist</th>
                     <th>Duration</th>
                     <th>Genre</th>
                     <th>Energy</th>
+                    <th>Tags</th>
                     <th></th>
                 </tr>
             </thead>
@@ -24,13 +26,25 @@
                 {% for song in songs %}
                     <tr>
                         <td>{{ song.title }}</td>
+                        <td>{{ song.alias or '—' }}</td>
                         <td>{{ song.artist }}</td>
                         <td>{{ song.duration_label }}</td>
                         <td>{{ song.genre or '—' }}</td>
                         <td>{{ song.energy or '—' }}</td>
+                        <td>
+                            {% if song.tag_summary %}
+                                {{ song.tag_summary }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td class="actions">
+                            <a class="link-button" href="{{ url_for('setlists.edit_song', song_id=song.id) }}">Edit</a>
                             <form method="post" action="{{ url_for('setlists.delete_song', song_id=song.id) }}" onsubmit="return confirm('Remove this song?');">
-                                <button type="submit" class="link-button">Remove</button>
+                                <button type="submit" class="link-button">
+                                    <span aria-hidden="true">🗑️</span>
+                                    <span class="sr-only">Remove song</span>
+                                </button>
                             </form>
                         </td>
                     </tr>
@@ -56,6 +70,10 @@
             <input type="text" name="artist" required>
         </label>
         <label>
+            Alias (print name)
+            <input type="text" name="alias" placeholder="Optional">
+        </label>
+        <label>
             Duration (mm:ss or minutes)
             <input type="text" name="duration" placeholder="3:45 or 3.75" required>
         </label>
@@ -67,7 +85,39 @@
             Energy (1-10)
             <input type="number" name="energy" min="1" max="10" placeholder="Optional">
         </label>
+        <fieldset class="checkbox-group">
+            <legend>Tags</legend>
+            <label class="checkbox">
+                <input type="checkbox" name="tags" value="M">
+                Multitrack (M)
+            </label>
+            <label class="checkbox">
+                <input type="checkbox" name="tags" value="CVR">
+                Cover (CVR)
+            </label>
+            <label class="checkbox">
+                <input type="checkbox" name="tags" value="VO">
+                Vocals Only (VO)
+            </label>
+        </fieldset>
         <button type="submit">Save Song</button>
+    </form>
+</section>
+
+<section class="panel secondary">
+    <header>
+        <h2>Import From CSV</h2>
+    </header>
+    <form method="post" action="{{ url_for('setlists.import_songs') }}" enctype="multipart/form-data">
+        <label>
+            CSV File
+            <input type="file" name="csv_file" accept=".csv,text/csv" required>
+        </label>
+        <p class="hint">
+            CSV must include columns: title, artist, duration (mm:ss or minutes).
+            Optional columns: alias, genre, energy, tags.
+        </p>
+        <button type="submit">Upload CSV</button>
     </form>
 </section>
 {% endblock %}

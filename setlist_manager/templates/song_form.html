@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Song · Setlist Manager{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <header>
+        <h2>Edit Song</h2>
+    </header>
+    <form method="post" class="stacked">
+        <label>
+            Title
+            <input type="text" name="title" value="{{ song.title }}" required>
+        </label>
+        <label>
+            Artist
+            <input type="text" name="artist" value="{{ song.artist }}" required>
+        </label>
+        <label>
+            Alias (print name)
+            <input type="text" name="alias" value="{{ song.alias or '' }}" placeholder="Optional">
+        </label>
+        <label>
+            Duration (mm:ss or minutes)
+            <input type="text" name="duration" value="{{ song.duration_label }}" required>
+        </label>
+        <label>
+            Genre
+            <input type="text" name="genre" value="{{ song.genre or '' }}" placeholder="Optional">
+        </label>
+        <label>
+            Energy (1-10)
+            <input type="number" name="energy" min="1" max="10" value="{{ song.energy or '' }}" placeholder="Optional">
+        </label>
+        <fieldset class="checkbox-group">
+            <legend>Tags</legend>
+            {% for code, label, _ in tag_definitions %}
+                <label class="checkbox">
+                    <input type="checkbox" name="tags" value="{{ code }}" {% if code in selected_tags %}checked{% endif %}>
+                    {{ label }} ({{ code }})
+                </label>
+            {% endfor %}
+        </fieldset>
+        <div class="button-row">
+            <button type="submit">Update Song</button>
+            <a href="{{ url_for('setlists.songs') }}" class="link-button">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

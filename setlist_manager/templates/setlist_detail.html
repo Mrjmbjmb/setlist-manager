@@ -7,6 +7,9 @@
     <header>
         <h2>{{ setlist.name }}</h2>
         <div class="panel-actions">
+            <a class="button" href="{{ url_for('setlists.print_setlist', setlist_id=setlist.id) }}" target="_blank" rel="noopener">
+                Generate PDF
+            </a>
             <form method="post" action="{{ url_for('setlists.delete_setlist', setlist_id=setlist.id) }}" onsubmit="return confirm('Delete this setlist?');">
                 <button type="submit" class="danger">Delete</button>
             </form>
@@ -33,6 +36,11 @@
             <dd>{{ setlist.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
         </div>
     </dl>
+    {% if setlist.entries %}
+        <p class="hint">
+            Total includes 30-second transitions between songs{% if setlist.has_encore_break %} and a 4-minute encore break{% endif %}.
+        </p>
+    {% endif %}
 
     {% if setlist.target_duration_seconds and setlist.entries %}
         <form method="post" action="{{ url_for('setlists.regenerate_setlist', setlist_id=setlist.id) }}" class="inline-form" onsubmit="return confirm('Regenerate using your target duration? This replaces the current order.');">
@@ -47,30 +55,65 @@
     </header>
 
     {% if setlist.entries %}
-        <table class="data-table">
+        <table class="data-table" data-setlist-table>
             <thead>
                 <tr>
                     <th>#</th>
+                    <th class="sr-only">Reorder</th>
                     <th>Title</th>
+                    <th>Print Name</th>
                     <th>Artist</th>
+                    <th>Tags</th>
                     <th>Duration</th>
                     <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody data-setlist-body data-reorder-url="{{ url_for('setlists.reorder_setlist', setlist_id=setlist.id) }}">
                 {% for entry in setlist.entries %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
+                    {% if entry.starts_encore and loop.index > 1 %}
+                        <tr class="encore-break">
+                            <td colspan="8">Encore</td>
+                        </tr>
+                    {% endif %}
+                    <tr data-entry-id="{{ entry.id }}">
+                        <td data-position-cell>{{ loop.index }}</td>
+                        <td class="drag-cell">
+                            <button type="button" data-drag-handle draggable="true" class="drag-handle" aria-label="Drag to reorder">☰</button>
+                        </td>
                         <td>{{ entry.song.title }}</td>
+                        <td>
+                            {% if entry.song.alias %}
+                                {{ entry.song.alias }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td>{{ entry.song.artist }}</td>
+                        <td>
+                            {% if entry.song.tag_summary %}
+                                {{ entry.song.tag_summary }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td>{{ entry.song.duration_label }}</td>
                         <td class="actions">
                             <form method="post" action="{{ url_for('setlists.move_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}">
                                 <button type="submit" name="direction" value="up" {% if loop.first %}disabled{% endif %}>↑</button>
                                 <button type="submit" name="direction" value="down" {% if loop.last %}disabled{% endif %}>↓</button>
                             </form>
+                            <form method="post" action="{{ url_for('setlists.toggle_encore_entry', setlist_id=setlist.id, entry_id=entry.id) }}">
+                                {% if entry.starts_encore %}
+                                    <button type="submit" class="link-button">Remove Encore Break</button>
+                                {% else %}
+                                    <button type="submit" class="link-button">Set Encore Break</button>
+                                {% endif %}
+                            </form>
                             <form method="post" action="{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}" onsubmit="return confirm('Remove this song from the setlist?');">
-                                <button type="submit" class="link-button">Remove</button>
+                                <button type="submit" class="link-button">
+                                    <span aria-hidden="true">🗑️</span>
+                                    <span class="sr-only">Remove from setlist</span>
+                                </button>
                             </form>
                         </td>
                     </tr>
@@ -94,7 +137,7 @@
                     <option value="">Choose a song…</option>
                     {% for song in available_songs %}
                         <option value="{{ song.id }}">
-                            {{ song.title }} — {{ song.artist }} ({{ song.duration_label }})
+                            {{ song.title }}{% if song.alias %} → {{ song.alias }}{% endif %} — {{ song.artist }} ({{ song.duration_label }}){% if song.tag_summary %} [{{ song.tag_summary }}]{% endif %}
                         </option>
                     {% endfor %}
                 </select>
@@ -105,4 +148,8 @@
         <p>Every song in your library is already in this setlist. <a href="{{ url_for('setlists.songs') }}">Add more songs</a>.</p>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='setlist.js') }}" defer></script>
 {% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Stats · Setlist Manager{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <header>
+        <h2>Library Snapshot</h2>
+    </header>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span class="label">Songs</span>
+            <strong>{{ total_songs }}</strong>
+            <span class="hint">Tracks in your library</span>
+        </div>
+        <div class="stat-card">
+            <span class="label">Setlists</span>
+            <strong>{{ total_setlists }}</strong>
+            <span class="hint">Saved shows</span>
+        </div>
+        <div class="stat-card">
+            <span class="label">Total Plays</span>
+            <strong>{{ total_plays }}</strong>
+            <span class="hint">Song placements across setlists</span>
+        </div>
+        <div class="stat-card">
+            <span class="label">Library Duration</span>
+            <strong>{{ library_duration_label }}</strong>
+            <span class="hint">Cumulative song runtime</span>
+        </div>
+        <div class="stat-card">
+            <span class="label">Avg Songs / Setlist</span>
+            <strong>{{ "%.1f"|format(avg_songs_per_setlist) }}</strong>
+            <span class="hint">Average song count per show</span>
+        </div>
+        <div class="stat-card">
+            <span class="label">Avg Setlist Length</span>
+            <strong>{{ avg_setlist_duration_label }}</strong>
+            <span class="hint">Includes 30s gaps & encore break</span>
+        </div>
+        {% if latest_setlist_at %}
+        <div class="stat-card">
+            <span class="label">Last Setlist</span>
+            <strong>{{ latest_setlist_at.strftime("%b %d, %Y") }}</strong>
+            <span class="hint">Most recent show creation</span>
+        </div>
+        {% endif %}
+        {% if longest_setlist %}
+        <div class="stat-card featured">
+            <span class="label">Longest Setlist</span>
+            <strong>{{ longest_setlist.duration_label }}</strong>
+            <span class="hint">{{ longest_setlist.name }} · {{ longest_setlist.song_count }} songs</span>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="panel">
+    <header>
+        <h2>Most Played Songs</h2>
+    </header>
+    {% if most_played_songs %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Song</th>
+                    <th>Artist</th>
+                    <th>Plays</th>
+                    <th>Last Played</th>
+                    <th>Tags</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in most_played_songs %}
+                    <tr>
+                        <td>{{ entry.song.print_title }}</td>
+                        <td>{{ entry.song.artist }}</td>
+                        <td>{{ entry.play_count }}</td>
+                        <td>
+                            {% if entry.last_played %}
+                                {{ entry.last_played.strftime("%b %d, %Y") }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if entry.song.tag_summary %}
+                                {{ entry.song.tag_summary }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No plays yet. Add songs to your setlists to build history.</p>
+    {% endif %}
+</section>
+
+<section class="panel secondary">
+    <header>
+        <h2>Recent Setlists</h2>
+    </header>
+    {% if recent_setlists %}
+        <ul class="stats-list">
+            {% for item in recent_setlists %}
+                <li>
+                    <strong>{{ item.name }}</strong>
+                    <span>{{ item.created_at.strftime("%b %d, %Y") }} · {{ item.song_count }} songs · {{ item.duration_label }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No setlists yet. Create one to see activity here.</p>
+    {% endif %}
+</section>
+
+<section class="panel secondary">
+    <header>
+        <h2>Tags In Use</h2>
+    </header>
+    {% if tag_counts %}
+        <div class="tag-stats">
+            {% for item in tag_counts %}
+                <div class="tag-card">
+                    <span class="code">{{ item.code }}</span>
+                    <strong>{{ item.count }}</strong>
+                    <span class="hint">{{ item.label }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No tag data yet.</p>
+    {% endif %}
+</section>
+
+<section class="panel secondary">
+    <header>
+        <h2>Never Played</h2>
+    </header>
+    {% if unused_songs %}
+        <p>
+            {{ unused_song_total }} song{% if unused_song_total != 1 %}s{% endif %} have never appeared in a setlist.
+            Here are the first {{ unused_songs|length }}:
+        </p>
+        <ul class="stats-list">
+            {% for song in unused_songs %}
+                <li>
+                    <strong>{{ song.print_title }}</strong>
+                    <span>{{ song.artist }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Every song has been used at least once — nice!</p>
+    {% endif %}
+</section>
+{% endblock %}
