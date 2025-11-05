@@ -788,6 +788,10 @@ def import_setlists():
         content = file.read().decode("utf-8")
         csv_reader = csv.DictReader(io.StringIO(content))
 
+        # Normalize column names by stripping whitespace
+        if csv_reader.fieldnames:
+            csv_reader.fieldnames = [name.strip() for name in csv_reader.fieldnames]
+
         # Validate required columns
         required_cols = ["setlist_name", "show_date", "song_title", "song_artist", "position"]
         if not all(col in csv_reader.fieldnames for col in required_cols):
