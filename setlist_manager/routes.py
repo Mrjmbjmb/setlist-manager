@@ -2,6 +2,7 @@ import csv
 import io
 import re
 from typing import Optional
+from datetime import datetime
 
 from flask import (
     Blueprint,
@@ -14,7 +15,6 @@ from flask import (
 )
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-from datetime import datetime
 
 from .database import db
 from .models import Setlist, SetlistSong, Song
@@ -631,7 +631,7 @@ def reorder_setlist(setlist_id: int):
         entry = entry_map[entry_id]
         entry.position = index
 
-    db.session.commit()
+    _normalize_positions(setlist_id)
     return {"status": "ok"}
 
 
@@ -667,14 +667,18 @@ def toggle_encore_entry(setlist_id: int, entry_id: int):
         .all()
     )
 
-    was_enabled = entry.starts_encore
+    entry_index = next((i for i, item in enumerate(entries) if item.id == entry_id), None)
+    if entry_index is None:
+        abort(404)
 
-    for item in entries:
-        item.starts_encore = False
+    if entry_index == 0:
+        flash("Encore break must follow at least one song.", "error")
+        return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
 
-    if not was_enabled:
-        entry.starts_encore = True
-        flash(f"Encore now starts with “{entry.song.print_title}”.", "success")
+    entry.starts_encore = not entry.starts_encore
+
+    if entry.starts_encore:
+        flash(f"Encore break added before “{entry.song.print_title}”.", "success")
     else:
         flash("Encore break removed.", "success")
 
@@ -752,14 +756,10 @@ def _normalize_positions(setlist_id: int) -> None:
         .order_by(SetlistSong.position)
         .all()
     )
-    encore_found = False
     for index, entry in enumerate(entries, start=1):
         entry.position = index
-        if entry.starts_encore:
-            if encore_found:
-                entry.starts_encore = False
-            else:
-                encore_found = True
+        if entry.starts_encore and index == 1:
+            entry.starts_encore = False
     db.session.commit()
 
 
@@ -785,7 +785,7 @@ def import_setlists():
 
     try:
         # Read and parse CSV
-        content = file.read().decode("utf-8")
+        content = file.read().decode("utf-8-sig")  # Handle BOM
         csv_reader = csv.DictReader(io.StringIO(content))
 
         # Normalize column names by stripping whitespace
@@ -794,7 +794,7 @@ def import_setlists():
 
         # Validate required columns
         required_cols = ["setlist_name", "show_date", "song_title", "song_artist", "position"]
-        if not all(col in csv_reader.fieldnames for col in required_cols):
+        if not csv_reader.fieldnames or not all(col in csv_reader.fieldnames for col in required_cols):
             flash(f"CSV must include columns: {', '.join(required_cols)}", "error")
             return redirect(request.url)
 
