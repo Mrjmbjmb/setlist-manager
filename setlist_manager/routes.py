@@ -827,10 +827,10 @@ def import_setlists():
                 skipped_rows.append(f"Row {row_num}: Position must be a number")
                 continue
 
-            # Find matching song in library
-            song = Song.query.filter_by(
-                title=row["song_title"].strip(),
-                artist=row["song_artist"].strip()
+            # Find matching song in library (case-insensitive)
+            song = Song.query.filter(
+                func.lower(Song.title) == func.lower(row["song_title"].strip()),
+                func.lower(Song.artist) == func.lower(row["song_artist"].strip())
             ).first()
 
             if not song:
