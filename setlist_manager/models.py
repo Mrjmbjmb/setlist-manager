@@ -64,6 +64,7 @@ class Setlist(db.Model):
     description = db.Column(db.Text)
     target_duration_seconds = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    show_date = db.Column(db.Date, nullable=True)  # Add this line
 
     entries = db.relationship(
         "SetlistSong",
