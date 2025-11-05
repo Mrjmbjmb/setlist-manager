@@ -75,9 +75,14 @@ class Setlist(db.Model):
 
     @property
     def has_encore_break(self) -> bool:
-        return any(
-            index > 0 and entry.starts_encore
+        return self.encore_break_count > 0
+
+    @property
+    def encore_break_count(self) -> int:
+        return sum(
+            1
             for index, entry in enumerate(self.entries)
+            if index > 0 and entry.starts_encore
         )
 
     @property

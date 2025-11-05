@@ -37,8 +37,9 @@
         </div>
     </dl>
     {% if setlist.entries %}
+        {% set encore_breaks = setlist.encore_break_count %}
         <p class="hint">
-            Total includes 30-second transitions between songs{% if setlist.has_encore_break %} and a 4-minute encore break{% endif %}.
+            Total includes 30-second transitions between songs{% if encore_breaks %} and {{ encore_breaks }} 4-minute encore break{% if encore_breaks != 1 %}s{% endif %}{% endif %}.
         </p>
     {% endif %}
 
@@ -69,10 +70,12 @@
                 </tr>
             </thead>
             <tbody data-setlist-body data-reorder-url="{{ url_for('setlists.reorder_setlist', setlist_id=setlist.id) }}">
+                {% set encore_counter = namespace(value=0) %}
                 {% for entry in setlist.entries %}
                     {% if entry.starts_encore and loop.index > 1 %}
+                        {% set encore_counter.value = encore_counter.value + 1 %}
                         <tr class="encore-break">
-                            <td colspan="8">Encore</td>
+                            <td colspan="8">Encore {{ encore_counter.value }}</td>
                         </tr>
                     {% endif %}
                     <tr data-entry-id="{{ entry.id }}">
@@ -106,7 +109,7 @@
                                 {% if entry.starts_encore %}
                                     <button type="submit" class="link-button">Remove Encore Break</button>
                                 {% else %}
-                                    <button type="submit" class="link-button">Set Encore Break</button>
+                                    <button type="submit" class="link-button" {% if loop.first %}disabled title="Encore break must follow at least one song."{% endif %}>Add Encore Break</button>
                                 {% endif %}
                             </form>
                             <form method="post" action="{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}" onsubmit="return confirm('Remove this song from the setlist?');">

@@ -39,7 +39,7 @@ A lightweight Flask web app for building and managing band setlists. Keep a libr
 - Provide an alias (print name) if you want the setlist to show a shortened or alternate title while keeping the library name intact.
 - Tag songs as Multitrack (`M`), Cover (`CVR`), or Vocals Only (`VO`) so you can spot production-specific tracks while building setlists.
 - Open the Stats page to review top songs, unused tracks, and pacing insights before planning your next show.
-- Drop an encore break anywhere in a setlist to separate the main set from the finale.
+- Drop encore breaks anywhere in a setlist to separate the main set from each finale segment.
 - Generate a stage-friendly PDF of any setlist with bold, easy-to-read titles.
 
 ### CSV Import Format
