@@ -761,3 +761,132 @@ def _normalize_positions(setlist_id: int) -> None:
             else:
                 encore_found = True
     db.session.commit()
+
+
+@bp.route("/setlists/import", methods=["GET", "POST"])
+def import_setlists():
+    """Import past setlists from CSV file."""
+    if request.method == "GET":
+        return render_template("import_setlists.html")
+
+    # Handle POST - file upload
+    if "file" not in request.files:
+        flash("No file uploaded", "error")
+        return redirect(request.url)
+
+    file = request.files["file"]
+    if file.filename == "":
+        flash("No file selected", "error")
+        return redirect(request.url)
+
+    if not file.filename.endswith(".csv"):
+        flash("Please upload a CSV file", "error")
+        return redirect(request.url)
+
+    try:
+        # Read and parse CSV
+        content = file.read().decode("utf-8")
+        csv_reader = csv.DictReader(io.StringIO(content))
+
+        # Validate required columns
+        required_cols = ["setlist_name", "show_date", "song_title", "song_artist", "position"]
+        if not all(col in csv_reader.fieldnames for col in required_cols):
+            flash(f"CSV must include columns: {', '.join(required_cols)}", "error")
+            return redirect(request.url)
+
+        # Group rows by setlist
+        setlists = {}
+        skipped_rows = []
+        row_num = 1
+
+        for row in csv_reader:
+            row_num += 1
+            setlist_key = (row["setlist_name"].strip(), row["show_date"].strip())
+
+            # Validate row data
+            if not all([row.get("setlist_name"), row.get("show_date"),
+                        row.get("song_title"), row.get("song_artist"), row.get("position")]):
+                skipped_rows.append(f"Row {row_num}: Missing required data")
+                continue
+
+            # Validate date format
+            try:
+                datetime.strptime(row["show_date"].strip(), "%Y-%m-%d")
+            except ValueError:
+                skipped_rows.append(f"Row {row_num}: Invalid date format (use YYYY-MM-DD)")
+                continue
+
+            # Validate position is a number
+            try:
+                position = int(row["position"].strip())
+            except ValueError:
+                skipped_rows.append(f"Row {row_num}: Position must be a number")
+                continue
+
+            # Find matching song in library
+            song = Song.query.filter_by(
+                title=row["song_title"].strip(),
+                artist=row["song_artist"].strip()
+            ).first()
+
+            if not song:
+                skipped_rows.append(
+                    f"Row {row_num}: Song '{row['song_title']}' by '{row['song_artist']}' not found in library")
+                continue
+
+            # Add to setlists dictionary
+            if setlist_key not in setlists:
+                setlists[setlist_key] = {
+                    "name": row["setlist_name"].strip(),
+                    "date": row["show_date"].strip(),
+                    "songs": []
+                }
+
+            setlists[setlist_key]["songs"].append({
+                "song_id": song.id,
+                "position": position,
+                "is_encore": bool(row.get("encore", "").strip())
+            })
+
+        # Create setlists in database
+        imported_count = 0
+        for setlist_data in setlists.values():
+            # Create new setlist
+            new_setlist = Setlist(
+                name=setlist_data["name"],
+                show_date=datetime.strptime(setlist_data["date"], "%Y-%m-%d").date()
+            )
+            db.session.add(new_setlist)
+            db.session.flush()  # Get the setlist ID
+
+            # Sort songs by position
+            sorted_songs = sorted(setlist_data["songs"], key=lambda x: x["position"])
+
+            # Add songs to setlist
+            for song_data in sorted_songs:
+                setlist_song = SetlistSong(
+                    setlist_id=new_setlist.id,
+                    song_id=song_data["song_id"],
+                    position=song_data["position"],
+                    starts_encore=song_data["is_encore"]
+                )
+                db.session.add(setlist_song)
+
+            imported_count += 1
+
+        db.session.commit()
+
+        # Show results
+        if imported_count > 0:
+            flash(f"Successfully imported {imported_count} setlist(s)", "success")
+        if skipped_rows:
+            flash(f"Skipped {len(skipped_rows)} row(s) with errors:", "warning")
+            for error in skipped_rows[:10]:  # Show first 10 errors
+                flash(error, "warning")
+
+        return redirect(url_for("setlists.index"))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error importing setlists: {str(e)}", "error")
+        return redirect(request.url)
