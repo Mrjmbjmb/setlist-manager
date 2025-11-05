@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Import Setlists{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Import Past Setlists</h1>
+    
+    <div class="import-instructions">
+        <h2>CSV Format Instructions</h2>
+        <p>Upload a UTF-8 encoded CSV file with the following columns:</p>
+        
+        <table class="format-table">
+            <thead>
+                <tr>
+                    <th>Column</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>setlist_name</code></td>
+                    <td>✓</td>
+                    <td>Name of the show/setlist</td>
+                    <td>Summer Festival 2024</td>
+                </tr>
+                <tr>
+                    <td><code>show_date</code></td>
+                    <td>✓</td>
+                    <td>Date in YYYY-MM-DD format</td>
+                    <td>2024-07-15</td>
+                </tr>
+                <tr>
+                    <td><code>song_title</code></td>
+                    <td>✓</td>
+                    <td>Song title (must exist in library)</td>
+                    <td>Song One</td>
+                </tr>
+                <tr>
+                    <td><code>song_artist</code></td>
+                    <td>✓</td>
+                    <td>Artist name (must match library)</td>
+                    <td>The Example Band</td>
+                </tr>
+                <tr>
+                    <td><code>position</code></td>
+                    <td>✓</td>
+                    <td>Song order (1, 2, 3, etc.)</td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td><code>encore</code></td>
+                    <td></td>
+                    <td>Leave blank for main set, any value for encore</td>
+                    <td>1</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h3>Example CSV:</h3>
+        <pre><code>setlist_name,show_date,song_title,song_artist,position,encore
+Summer Festival 2024,2024-07-15,Song One,The Example Band,1,
+Summer Festival 2024,2024-07-15,Song Two,Another Artist,2,
+Summer Festival 2024,2024-07-15,Song Three,The Example Band,3,1
+Winter Show 2024,2024-12-20,Song Two,Another Artist,1,
+Winter Show 2024,2024-12-20,Song One,The Example Band,2,</code></pre>
+        
+        <div class="alert alert-info">
+            <strong>Note:</strong> Songs must already exist in your library. The import will skip any songs that don't match exactly (title and artist).
+        </div>
+    </div>
+    
+    <div class="upload-form">
+        <h2>Upload CSV File</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Select CSV File:</label>
+                <input type="file" id="file" name="file" accept=".csv" required>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Import Setlists</button>
+                <a href="{{ url_for('setlists.index') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.import-instructions {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+.format-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.format-table th,
+.format-table td {
+    padding: 12px;
+    text-align: left;
+    border: 1px solid #dee2e6;
+}
+
+.format-table th {
+    background-color: #e9ecef;
+    font-weight: bold;
+}
+
+.format-table code {
+    background-color: #f1f3f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.format-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+pre {
+    background-color: #f1f3f5;
+    padding: 15px;
+    border-radius: 5px;
+    overflow-x: auto;
+    font-size: 14px;
+}
+
+.alert {
+    padding: 15px;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+.upload-form {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.form-group input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    border: 2px dashed #dee2e6;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+}
+</style>
+{% endblock %}
