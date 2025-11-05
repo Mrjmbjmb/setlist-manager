@@ -857,8 +857,7 @@ def import_setlists():
         for setlist_data in setlists.values():
             # Create new setlist
             new_setlist = Setlist(
-                name=setlist_data["name"],
-                show_date=datetime.strptime(setlist_data["date"], "%Y-%m-%d").date()
+                name=setlist_data["name"]
             )
             db.session.add(new_setlist)
             db.session.flush()  # Get the setlist ID
