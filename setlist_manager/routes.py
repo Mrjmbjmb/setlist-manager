@@ -740,6 +740,25 @@ def regenerate_setlist(setlist_id: int):
     flash("Setlist regenerated.", "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
+@bp.post("/setlists/<int:setlist_id>/delete")
+def delete_setlist(setlist_id: int):
+    setlist = Setlist.query.get_or_404(setlist_id)
+    db.session.delete(setlist)
+    db.session.commit()
+    flash("Setlist deleted.", "success")
+    return redirect(url_for("setlists.index"))
+
+def _normalize_positions(setlist_id: int) -> None:
+    entries = (
+        SetlistSong.query.filter_by(setlist_id=setlist_id)
+        .order_by(SetlistSong.position)
+        .all()
+    )
+    for index, entry in enumerate(entries, start=1):
+        entry.position = index
+        if entry.starts_encore and index == 1:
+            entry.starts_encore = False
+    db.session.commit()
 
 @bp.route("/setlists/import", methods=["GET", "POST"])
 def import_setlists():
