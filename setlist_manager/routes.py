@@ -741,28 +741,6 @@ def regenerate_setlist(setlist_id: int):
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
 
-@bp.post("/setlists/<int:setlist_id>/delete")
-def delete_setlist(setlist_id: int):
-    setlist = Setlist.query.get_or_404(setlist_id)
-    db.session.delete(setlist)
-    db.session.commit()
-    flash("Setlist deleted.", "success")
-    return redirect(url_for("setlists.index"))
-
-
-def _normalize_positions(setlist_id: int) -> None:
-    entries = (
-        SetlistSong.query.filter_by(setlist_id=setlist_id)
-        .order_by(SetlistSong.position)
-        .all()
-    )
-    for index, entry in enumerate(entries, start=1):
-        entry.position = index
-        if entry.starts_encore and index == 1:
-            entry.starts_encore = False
-    db.session.commit()
-
-
 @bp.route("/setlists/import", methods=["GET", "POST"])
 def import_setlists():
     """Import past setlists from CSV file."""
@@ -827,10 +805,21 @@ def import_setlists():
                 skipped_rows.append(f"Row {row_num}: Position must be a number")
                 continue
 
-            # Find matching song in library (case-insensitive)
+            # Find matching song in library (case-insensitive, match title or alias)
+            song_title_search = row["song_title"].strip()
+            song_artist_search = row["song_artist"].strip()
+
             song = Song.query.filter(
-                func.lower(Song.title) == func.lower(row["song_title"].strip()),
-                func.lower(Song.artist) == func.lower(row["song_artist"].strip())
+                db.or_(
+                    db.and_(
+                        func.lower(Song.title) == func.lower(song_title_search),
+                        func.lower(Song.artist) == func.lower(song_artist_search)
+                    ),
+                    db.and_(
+                        func.lower(Song.alias) == func.lower(song_title_search),
+                        func.lower(Song.artist) == func.lower(song_artist_search)
+                    )
+                )
             ).first()
 
             if not song:
@@ -857,7 +846,8 @@ def import_setlists():
         for setlist_data in setlists.values():
             # Create new setlist
             new_setlist = Setlist(
-                name=setlist_data["name"]
+                name=setlist_data["name"],
+                show_date=datetime.strptime(setlist_data["date"], "%Y-%m-%d").date()
             )
             db.session.add(new_setlist)
             db.session.flush()  # Get the setlist ID
