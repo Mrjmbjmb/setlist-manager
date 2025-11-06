@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import re
 from typing import Optional
 from datetime import datetime
@@ -13,6 +14,7 @@ from flask import (
     render_template,
     request,
     url_for,
+    send_file,
 )
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -1112,4 +1114,210 @@ def import_setlists():
     except Exception as e:
         db.session.rollback()
         flash(f"Error importing setlists: {str(e)}", "error")
+        return redirect(request.url)
+
+
+@bp.route("/database/export")
+def export_database():
+    """Export the entire database to JSON format."""
+    try:
+        # Export all songs
+        songs = Song.query.all()
+        songs_data = []
+        for song in songs:
+            song_dict = {
+                "id": song.id,
+                "title": song.title,
+                "artist": song.artist,
+                "alias": song.alias,
+                "duration_seconds": song.duration_seconds,
+                "genre": song.genre,
+                "energy": song.energy,
+                "is_multitrack": song.is_multitrack,
+                "is_cover": song.is_cover,
+                "is_vocals_only": song.is_vocals_only,
+            }
+            songs_data.append(song_dict)
+
+        # Export all setlists with their songs
+        setlists = Setlist.query.options(
+            joinedload(Setlist.entries).joinedload(SetlistSong.song)
+        ).all()
+
+        setlists_data = []
+        for setlist in setlists:
+            setlist_dict = {
+                "id": setlist.id,
+                "name": setlist.name,
+                "description": setlist.description,
+                "target_duration_seconds": setlist.target_duration_seconds,
+                "created_at": setlist.created_at.isoformat() if setlist.created_at else None,
+                "show_date": setlist.show_date.isoformat() if setlist.show_date else None,
+                "entries": []
+            }
+
+            for entry in setlist.entries:
+                entry_dict = {
+                    "id": entry.id,
+                    "song_id": entry.song_id,
+                    "position": entry.position,
+                    "notes": entry.notes,
+                    "starts_encore": entry.starts_encore,
+                    "song": {
+                        "title": entry.song.title,
+                        "artist": entry.song.artist,
+                        "alias": entry.song.alias,
+                        "duration_seconds": entry.song.duration_seconds,
+                    } if entry.song else None
+                }
+                setlist_dict["entries"].append(entry_dict)
+
+            setlists_data.append(setlist_dict)
+
+        # Create the export data structure
+        export_data = {
+            "export_info": {
+                "version": "1.0",
+                "exported_at": datetime.utcnow().isoformat(),
+                "total_songs": len(songs_data),
+                "total_setlists": len(setlists_data)
+            },
+            "songs": songs_data,
+            "setlists": setlists_data
+        }
+
+        # Create JSON file in memory
+        json_data = json.dumps(export_data, indent=2, ensure_ascii=False)
+        json_bytes = io.BytesIO(json_data.encode('utf-8'))
+
+        # Create filename with timestamp
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"setlist_database_export_{timestamp}.json"
+
+        return send_file(
+            json_bytes,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/json'
+        )
+
+    except Exception as e:
+        flash(f"Error exporting database: {str(e)}", "error")
+        return redirect(url_for("setlists.index"))
+
+
+@bp.route("/database/import", methods=["GET", "POST"])
+def import_database():
+    """Import database from JSON format."""
+    if request.method == "GET":
+        return render_template("import_database.html")
+
+    # Handle POST - file upload
+    if "file" not in request.files:
+        flash("No file uploaded", "error")
+        return redirect(request.url)
+
+    file = request.files["file"]
+    if file.filename == "":
+        flash("No file selected", "error")
+        return redirect(request.url)
+
+    if not file.filename.endswith(".json"):
+        flash("Please upload a JSON file", "error")
+        return redirect(request.url)
+
+    try:
+        # Read and parse JSON
+        content = file.read().decode("utf-8")
+        data = json.loads(content)
+
+        # Validate JSON structure
+        if not all(key in data for key in ["songs", "setlists"]):
+            flash("Invalid JSON format. Missing 'songs' or 'setlists' sections.", "error")
+            return redirect(request.url)
+
+        # Clear existing data if requested
+        clear_existing = request.form.get("clear_existing") == "on"
+        if clear_existing:
+            # Delete all setlist entries first (due to foreign key constraints)
+            SetlistSong.query.delete()
+            # Delete all setlists
+            Setlist.query.delete()
+            # Delete all songs
+            Song.query.delete()
+            db.session.commit()
+            flash("Cleared existing database data.", "info")
+
+        imported_songs = 0
+        imported_setlists = 0
+        song_id_mapping = {}  # Map old song IDs to new song IDs
+
+        # Import songs
+        for song_data in data.get("songs", []):
+            # Check if song already exists (when not clearing existing data)
+            if not clear_existing:
+                existing = Song.query.filter_by(
+                    title=song_data["title"],
+                    artist=song_data["artist"]
+                ).first()
+                if existing:
+                    song_id_mapping[song_data["id"]] = existing.id
+                    continue
+
+            song = Song(
+                title=song_data["title"],
+                artist=song_data["artist"],
+                alias=song_data.get("alias"),
+                duration_seconds=song_data["duration_seconds"],
+                genre=song_data.get("genre"),
+                energy=song_data.get("energy"),
+                is_multitrack=song_data.get("is_multitrack", False),
+                is_cover=song_data.get("is_cover", False),
+                is_vocals_only=song_data.get("is_vocals_only", False),
+            )
+            db.session.add(song)
+            db.session.flush()  # Get the new song ID
+            song_id_mapping[song_data["id"]] = song.id
+            imported_songs += 1
+
+        # Import setlists
+        for setlist_data in data.get("setlists", []):
+            setlist = Setlist(
+                name=setlist_data["name"],
+                description=setlist_data.get("description"),
+                target_duration_seconds=setlist_data.get("target_duration_seconds"),
+                show_date=datetime.fromisoformat(setlist_data["show_date"]).date() if setlist_data.get("show_date") else None,
+            )
+            db.session.add(setlist)
+            db.session.flush()  # Get the new setlist ID
+
+            # Import setlist entries
+            for entry_data in setlist_data.get("entries", []):
+                # Map old song ID to new song ID
+                new_song_id = song_id_mapping.get(entry_data["song_id"])
+                if not new_song_id:
+                    continue  # Skip entry if song wasn't imported
+
+                entry = SetlistSong(
+                    setlist_id=setlist.id,
+                    song_id=new_song_id,
+                    position=entry_data["position"],
+                    notes=entry_data.get("notes"),
+                    starts_encore=entry_data.get("starts_encore", False),
+                )
+                db.session.add(entry)
+
+            imported_setlists += 1
+
+        db.session.commit()
+
+        flash(f"Successfully imported {imported_songs} songs and {imported_setlists} setlists.", "success")
+        return redirect(url_for("setlists.index"))
+
+    except json.JSONDecodeError:
+        flash("Invalid JSON file format.", "error")
+        return redirect(request.url)
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error importing database: {str(e)}", "error")
         return redirect(request.url)

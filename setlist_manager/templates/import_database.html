@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Import Database{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Import Database</h1>
+
+    <div class="import-instructions">
+        <h2>JSON Format Instructions</h2>
+        <p>Upload a JSON file exported from this Setlist Manager application.</p>
+
+        <h3>JSON Structure:</h3>
+        <p>The JSON file should contain the following structure:</p>
+
+        <pre><code>{
+  "export_info": {
+    "version": "1.0",
+    "exported_at": "2024-07-15T10:30:00.000000",
+    "total_songs": 50,
+    "total_setlists": 10
+  },
+  "songs": [
+    {
+      "id": 1,
+      "title": "Song Title",
+      "artist": "Artist Name",
+      "alias": "Alternative Title",
+      "duration_seconds": 210,
+      "genre": "Rock",
+      "energy": 7,
+      "is_multitrack": true,
+      "is_cover": false,
+      "is_vocals_only": false
+    }
+  ],
+  "setlists": [
+    {
+      "id": 1,
+      "name": "Show Name",
+      "description": "Show description",
+      "target_duration_seconds": 3600,
+      "created_at": "2024-07-15T10:30:00.000000",
+      "show_date": "2024-07-15",
+      "entries": [
+        {
+          "id": 1,
+          "song_id": 1,
+          "position": 1,
+          "notes": "Performance notes",
+          "starts_encore": false,
+          "song": {
+            "title": "Song Title",
+            "artist": "Artist Name",
+            "alias": "Alternative Title",
+            "duration_seconds": 210
+          }
+        }
+      ]
+    }
+  ]
+}</code></pre>
+
+        <div class="alert alert-warning">
+            <strong>Important:</strong>
+            <ul>
+                <li>Only JSON files exported from this application are supported</li>
+                <li>Duplicate songs will be skipped when merging with existing data</li>
+                <li>Choose whether to clear existing data or merge with it</li>
+                <li>All song and setlist relationships will be preserved</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="upload-form">
+        <h2>Upload JSON File</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Select JSON File:</label>
+                <input type="file" id="file" name="file" accept=".json" required>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="clear_existing" id="clear_existing">
+                    Clear existing database before importing
+                </label>
+                <p class="help-text">If checked, all existing songs and setlists will be deleted before importing.</p>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Import Database</button>
+                <a href="{{ url_for('setlists.index') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.import-instructions {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+pre {
+    background-color: #f1f3f5;
+    padding: 15px;
+    border-radius: 5px;
+    overflow-x: auto;
+    font-size: 14px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.alert {
+    padding: 15px;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.alert ul {
+    margin: 10px 0 0 20px;
+    padding: 0;
+}
+
+.alert li {
+    margin-bottom: 5px;
+}
+
+.upload-form {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.form-group input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    border: 2px dashed #dee2e6;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.form-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.help-text {
+    font-size: 14px;
+    color: #6c757d;
+    margin-top: 5px;
+    margin-bottom: 0;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+}
+</style>
+{% endblock %}
