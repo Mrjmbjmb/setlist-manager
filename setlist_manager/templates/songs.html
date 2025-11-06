@@ -9,48 +9,54 @@
     </header>
 
     {% if songs %}
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Alias</th>
-                    <th>Artist</th>
-                    <th>Duration</th>
-                    <th>Genre</th>
-                    <th>Energy</th>
-                    <th>Tags</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for song in songs %}
+        <div data-sortable-table>
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>{{ song.title }}</td>
-                        <td>{{ song.alias or '—' }}</td>
-                        <td>{{ song.artist }}</td>
-                        <td>{{ song.duration_label }}</td>
-                        <td>{{ song.genre or '—' }}</td>
-                        <td>{{ song.energy or '—' }}</td>
-                        <td>
-                            {% if song.tag_summary %}
-                                {{ song.tag_summary }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td class="actions">
-                            <a class="link-button" href="{{ url_for('setlists.edit_song', song_id=song.id) }}">Edit</a>
-                            <form method="post" action="{{ url_for('setlists.delete_song', song_id=song.id) }}" onsubmit="return confirm('Remove this song?');">
-                                <button type="submit" class="link-button">
-                                    <span aria-hidden="true">🗑️</span>
-                                    <span class="sr-only">Remove song</span>
-                                </button>
-                            </form>
-                        </td>
+                        <th data-sortable="text">Title</th>
+                        <th data-sortable="text">Alias</th>
+                        <th data-sortable="text">Artist</th>
+                        <th data-sortable="duration">Duration</th>
+                        <th data-sortable="text">Tags</th>
+                        <th data-sortable="number">Plays</th>
+                        <th data-sortable="date">Last Played</th>
+                        <th></th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for song_data in songs %}
+                        {% set song = song_data.song %}
+                        <tr>
+                            <td>{{ song.title }}</td>
+                            <td>{{ song.alias or '—' }}</td>
+                            <td>{{ song.artist }}</td>
+                            <td>{{ song.duration_label }}</td>
+                            <td>
+                                {% if song.tag_summary %}
+                                    {{ song.tag_summary }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>{{ song_data.play_count }}</td>
+                            <td>
+                                {% if song_data.last_played %}
+                                    {{ song_data.last_played.strftime('%b %d, %Y') }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td class="actions">
+                                <a class="button" href="{{ url_for('setlists.edit_song', song_id=song.id) }}">Edit</a>
+                                <form method="post" action="{{ url_for('setlists.delete_song', song_id=song.id) }}" onsubmit="return confirm('Remove this song?');">
+                                    <button type="submit" class="danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
         <p>No songs yet. Add some using the form below.</p>
     {% endif %}
@@ -120,4 +126,8 @@
         <button type="submit">Upload CSV</button>
     </form>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='sortable-table.js') }}" defer></script>
 {% endblock %}

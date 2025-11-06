@@ -13,37 +13,49 @@
     </header>
 
     {% if setlists %}
-        <ul class="setlist-grid">
-            {% for setlist in setlists %}
-                <li class="setlist-card">
-                    <h3><a href="{{ url_for('setlists.view_setlist', setlist_id=setlist.id) }}">{{ setlist.name }}</a></h3>
-                    {% if setlist.description %}
-                        <p class="setlist-description">{{ setlist.description }}</p>
-                    {% endif %}
-                    <dl>
-                        <div>
-                            <dt>Songs</dt>
-                            <dd>{{ setlist.entries|length }}</dd>
-                        </div>
-                        <div>
-                            <dt>Total Duration</dt>
-                            <dd>{{ setlist.total_duration_label }}</dd>
-                        </div>
-                        <div>
-                            <dt>Target</dt>
-                            <dd>{{ setlist.target_duration_label }}</dd>
-                        </div>
-                        <div>
-                            <dt>Created</dt>
-                            <dd>{{ setlist.created_at.strftime('%b %d, %Y') }}</dd>
-                        </div>
-                    </dl>
-                    <footer>
-                        <a class="button" href="{{ url_for('setlists.view_setlist', setlist_id=setlist.id) }}">Open</a>
-                    </footer>
-                </li>
-            {% endfor %}
-        </ul>
+        <div data-sortable-table>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th data-sortable="text">Name</th>
+                        <th data-sortable="date">Show Date</th>
+                        <th data-sortable="number">Songs</th>
+                        <th data-sortable="duration">Total Duration</th>
+                        <th data-sortable="duration">Target Duration</th>
+                        <th data-sortable="date">Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+            <tbody>
+                {% for setlist in setlists %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('setlists.view_setlist', setlist_id=setlist.id) }}" class="setlist-link">
+                                <strong>{{ setlist.name }}</strong>
+                            </a>
+                            {% if setlist.description %}
+                                <br><small class="setlist-description">{{ setlist.description }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if setlist.show_date %}
+                                {{ setlist.show_date.strftime('%b %d, %Y') }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ setlist.entries|length }}</td>
+                        <td>{{ setlist.total_duration_label }}</td>
+                        <td>{{ setlist.target_duration_label }}</td>
+                        <td>{{ setlist.created_at.strftime('%b %d, %Y') }}</td>
+                        <td>
+                            <a class="button" href="{{ url_for('setlists.view_setlist', setlist_id=setlist.id) }}">Open</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
         <p>No setlists yet — <a href="{{ url_for('setlists.create_setlist') }}">create your first one</a>.</p>
     {% endif %}
@@ -56,4 +68,8 @@
     <p>You currently have {{ total_songs }} song{{ '' if total_songs == 1 else 's' }} saved.</p>
     <p><a href="{{ url_for('setlists.songs') }}">Manage songs</a></p>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='sortable-table.js') }}" defer></script>
 {% endblock %}

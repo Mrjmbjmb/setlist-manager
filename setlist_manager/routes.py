@@ -8,6 +8,7 @@ from flask import (
     Blueprint,
     abort,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -134,7 +135,29 @@ def songs():
         flash(f"Added “{song.title}” by {song.artist}.", "success")
         return redirect(url_for("setlists.songs"))
 
-    songs_list = Song.query.order_by(Song.title).all()
+    # Get songs with play count and last play date
+    songs_with_stats = (
+        db.session.query(
+            Song,
+            func.count(SetlistSong.id).label("play_count"),
+            func.coalesce(func.max(Setlist.show_date), func.date(Setlist.created_at)).label("last_played"),
+        )
+        .outerjoin(SetlistSong, SetlistSong.song_id == Song.id)
+        .outerjoin(Setlist, SetlistSong.setlist_id == Setlist.id)
+        .group_by(Song.id)
+        .order_by(Song.title)
+        .all()
+    )
+
+    songs_list = [
+        {
+            "song": song,
+            "play_count": play_count,
+            "last_played": last_played,
+        }
+        for song, play_count, last_played in songs_with_stats
+    ]
+
     return render_template("songs.html", songs=songs_list)
 
 
@@ -215,12 +238,12 @@ def stats():
         db.session.query(
             Song,
             func.count(SetlistSong.id).label("play_count"),
-            func.max(Setlist.created_at).label("last_played"),
+            func.coalesce(func.max(Setlist.show_date), func.date(Setlist.created_at)).label("last_played"),
         )
         .join(SetlistSong, SetlistSong.song_id == Song.id)
         .join(Setlist, SetlistSong.setlist_id == Setlist.id)
         .group_by(Song.id)
-        .order_by(func.count(SetlistSong.id).desc(), func.max(Setlist.created_at).desc())
+        .order_by(func.count(SetlistSong.id).desc(), func.coalesce(func.max(Setlist.show_date), func.date(Setlist.created_at)).desc())
         .limit(10)
         .all()
     )
@@ -504,6 +527,97 @@ def view_setlist(setlist_id: int):
     )
 
 
+@bp.route("/setlists/<int:setlist_id>/available-songs/search")
+def search_available_songs(setlist_id: int):
+    """API endpoint for searching available songs to add to a setlist."""
+    setlist = Setlist.query.get_or_404(setlist_id)
+
+    # Get query parameters
+    query = request.args.get("q", "").strip()
+    sort_by = request.args.get("sort", "title")  # title, artist, duration, energy
+    genre_filter = request.args.get("genre", "").strip()
+    tag_filter = request.args.get("tag", "").strip()
+
+    # Base query with play statistics - songs not already in this setlist
+    base_query = (
+        db.session.query(
+            Song,
+            func.count(SetlistSong.id).label("play_count"),
+            func.coalesce(func.max(Setlist.show_date), func.date(Setlist.created_at)).label("last_played"),
+        )
+        .outerjoin(SetlistSong, SetlistSong.song_id == Song.id)
+        .outerjoin(Setlist, SetlistSong.setlist_id == Setlist.id)
+        .filter(~Song.setlist_entries.any(SetlistSong.setlist_id == setlist_id))
+        .group_by(Song.id)
+    )
+
+    # Apply text search
+    if query:
+        search_pattern = f"%{query}%"
+        base_query = base_query.filter(
+            db.or_(
+                Song.title.ilike(search_pattern),
+                Song.artist.ilike(search_pattern),
+                Song.alias.ilike(search_pattern),
+                Song.genre.ilike(search_pattern),
+            )
+        )
+
+    # Apply filters
+    if genre_filter:
+        base_query = base_query.filter(Song.genre.ilike(f"%{genre_filter}%"))
+
+    if tag_filter:
+        if tag_filter == "M":
+            base_query = base_query.filter(Song.is_multitrack == True)
+        elif tag_filter == "CVR":
+            base_query = base_query.filter(Song.is_cover == True)
+        elif tag_filter == "VO":
+            base_query = base_query.filter(Song.is_vocals_only == True)
+
+    # Apply sorting
+    if sort_by == "title":
+        base_query = base_query.order_by(Song.title)
+    elif sort_by == "artist":
+        base_query = base_query.order_by(Song.artist, Song.title)
+    elif sort_by == "duration":
+        base_query = base_query.order_by(Song.duration_seconds)
+    elif sort_by == "energy":
+        base_query = base_query.order_by(Song.energy.desc().nullslast(), Song.title)
+    elif sort_by == "plays":
+        base_query = base_query.order_by(func.count(SetlistSong.id).desc(), Song.title)
+    elif sort_by == "last_played":
+        base_query = base_query.order_by(func.coalesce(func.max(Setlist.show_date), func.date(Setlist.created_at)).desc().nullslast(), Song.title)
+    else:
+        base_query = base_query.order_by(Song.title)
+
+    available_songs_result = base_query.all()
+    available_songs = [song for song, play_count, last_played in available_songs_result]
+
+    # Return JSON response with play statistics
+    songs_data = []
+    for song, play_count, last_played in available_songs_result:
+        songs_data.append({
+            "id": song.id,
+            "title": song.title,
+            "artist": song.artist,
+            "alias": song.alias,
+            "duration_label": song.duration_label,
+            "duration_seconds": song.duration_seconds,
+            "genre": song.genre,
+            "energy": song.energy,
+            "tag_summary": song.tag_summary,
+            "print_title": song.print_title,
+            "play_count": play_count,
+            "last_played": last_played.strftime('%Y-%m-%d') if last_played else None,
+        })
+
+    return jsonify({
+        "songs": songs_data,
+        "total": len(songs_data)
+    })
+
+
 @bp.get("/setlists/<int:setlist_id>/print")
 def print_setlist(setlist_id: int):
     setlist = (
@@ -579,15 +693,22 @@ def add_song_to_setlist(setlist_id: int):
     try:
         song_id = int(request.form.get("song_id", "").strip())
     except ValueError:
+        # Handle AJAX request differently
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"status": "error", "message": "Select a song to add."}), 400
         flash("Select a song to add.", "error")
         return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
     song = Song.query.get(song_id)
     if song is None:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"status": "error", "message": "Song not found."}), 404
         flash("Song not found.", "error")
         return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
+    # Always add to end of setlist
     position = len(setlist.entries) + 1
+
     entry = SetlistSong(
         setlist_id=setlist.id,
         song_id=song.id,
@@ -596,7 +717,14 @@ def add_song_to_setlist(setlist_id: int):
     db.session.add(entry)
     db.session.commit()
 
-    flash(f"Added “{song.title}” to {setlist.name}.", "success")
+    # Handle AJAX response
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({
+            "status": "success",
+            "message": f'Added "{song.title}" to {setlist.name}.'
+        })
+
+    flash(f'Added "{song.title}" to {setlist.name}.', "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
 
@@ -644,46 +772,22 @@ def remove_setlist_entry(setlist_id: int, entry_id: int):
     if entry is None:
         abort(404)
 
+    song_title = entry.song.title
     db.session.delete(entry)
     db.session.commit()
     _normalize_positions(setlist_id)
+
+    # Handle AJAX request
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({
+            "status": "success",
+            "message": f'Removed "{song_title}" from setlist.'
+        })
 
     flash("Removed song from setlist.", "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
 
 
-@bp.post("/setlists/<int:setlist_id>/entries/<int:entry_id>/toggle-encore")
-def toggle_encore_entry(setlist_id: int, entry_id: int):
-    entry = (
-        SetlistSong.query.filter_by(setlist_id=setlist_id, id=entry_id)
-        .first()
-    )
-    if entry is None:
-        abort(404)
-
-    entries = (
-        SetlistSong.query.filter_by(setlist_id=setlist_id)
-        .order_by(SetlistSong.position)
-        .all()
-    )
-
-    entry_index = next((i for i, item in enumerate(entries) if item.id == entry_id), None)
-    if entry_index is None:
-        abort(404)
-
-    if entry_index == 0:
-        flash("Encore break must follow at least one song.", "error")
-        return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
-
-    entry.starts_encore = not entry.starts_encore
-
-    if entry.starts_encore:
-        flash(f"Encore break added before “{entry.song.print_title}”.", "success")
-    else:
-        flash("Encore break removed.", "success")
-
-    db.session.commit()
-    return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
 
 
 @bp.post("/setlists/<int:setlist_id>/entries/<int:entry_id>/move")
@@ -714,6 +818,113 @@ def move_setlist_entry(setlist_id: int, entry_id: int):
         )
 
     db.session.commit()
+    return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
+
+
+@bp.post("/setlists/<int:setlist_id>/add-encore-break")
+def add_encore_break(setlist_id: int):
+    """Add an encore break to the end of the setlist."""
+    setlist = Setlist.query.get_or_404(setlist_id)
+
+    if not setlist.entries:
+        flash("Add at least one song before adding an encore break.", "error")
+        return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
+
+    # Find the last song and set it to start an encore
+    last_entry = setlist.entries[-1]
+    if not last_entry.starts_encore:
+        last_entry.starts_encore = True
+        db.session.commit()
+        flash("Encore break added to setlist.", "success")
+    else:
+        flash("Last song is already an encore.", "error")
+
+    return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
+
+
+@bp.post("/setlists/<int:setlist_id>/entries/<int:entry_id>/remove-encore")
+def remove_encore_break(setlist_id: int, entry_id: int):
+    """Remove encore break from a song."""
+    entry = (
+        SetlistSong.query.filter_by(setlist_id=setlist_id, id=entry_id)
+        .first()
+    )
+    if entry is None:
+        abort(404)
+
+    if entry.starts_encore:
+        entry.starts_encore = False
+        db.session.commit()
+
+        # Handle AJAX request
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "status": "success",
+                "message": "Encore break removed."
+            })
+
+        flash("Encore break removed.", "success")
+    else:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "status": "error",
+                "message": "This song is not an encore."
+            }), 400
+
+        flash("This song is not an encore.", "error")
+
+    return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
+
+
+@bp.post("/setlists/<int:setlist_id>/entries/<int:entry_id>/add-encore")
+def add_encore_break_at_position(setlist_id: int, entry_id: int):
+    """Add an encore break after the specified song."""
+    setlist = Setlist.query.get_or_404(setlist_id)
+
+    # Find the target entry
+    target_entry = (
+        SetlistSong.query.filter_by(setlist_id=setlist_id, id=entry_id)
+        .first()
+    )
+    if target_entry is None:
+        abort(404)
+
+    # Find the next entry in position order
+    next_entry = (
+        SetlistSong.query
+        .filter_by(setlist_id=setlist_id)
+        .filter(SetlistSong.position > target_entry.position)
+        .order_by(SetlistSong.position)
+        .first()
+    )
+
+    # If there's no next entry, this is the last song
+    if not next_entry:
+        target_entry.starts_encore = True
+        db.session.commit()
+
+        # Handle AJAX request
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "status": "success",
+                "message": "Encore break added after last song."
+            })
+
+        flash("Encore break added after last song.", "success")
+    else:
+        # Make the next entry start an encore
+        next_entry.starts_encore = True
+        db.session.commit()
+
+        # Handle AJAX request
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "status": "success",
+                "message": f'Encore break added before "{next_entry.song.print_title}".'
+            })
+
+        flash(f'Encore break added before "{next_entry.song.print_title}".', "success")
+
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
 
 

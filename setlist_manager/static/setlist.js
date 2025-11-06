@@ -100,11 +100,22 @@
 
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", row.dataset.entryId);
+
+        // Add visual feedback to the drag handle
+        handle.style.transform = 'scale(1.1)';
+        handle.style.background = '#e7efff';
     });
 
     tableBody.addEventListener("dragend", () => {
         if (draggedRow) {
             draggedRow.classList.remove("dragging");
+
+            // Reset drag handle styling
+            const handle = draggedRow.querySelector('[data-drag-handle]');
+            if (handle) {
+                handle.style.transform = '';
+                handle.style.background = '';
+            }
         }
         draggedRow = null;
         draggedEncoreRow = null;

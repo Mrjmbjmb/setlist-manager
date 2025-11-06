@@ -3,156 +3,303 @@
 {% block title %}{{ setlist.name }} · Setlist Manager{% endblock %}
 
 {% block content %}
-<section class="panel">
-    <header>
-        <h2>{{ setlist.name }}</h2>
-        <div class="panel-actions">
-            <a class="button" href="{{ url_for('setlists.print_setlist', setlist_id=setlist.id) }}" target="_blank" rel="noopener">
-                Generate PDF
-            </a>
-            <form method="post" action="{{ url_for('setlists.delete_setlist', setlist_id=setlist.id) }}" onsubmit="return confirm('Delete this setlist?');">
-                <button type="submit" class="danger">Delete</button>
-            </form>
-        </div>
-    </header>
-    {% if setlist.description %}
-        <p class="setlist-description">{{ setlist.description }}</p>
-    {% endif %}
-    <dl class="setlist-meta">
-        <div>
-            <dt>Total Duration</dt>
-            <dd>{{ setlist.total_duration_label }}</dd>
-        </div>
-        <div>
-            <dt>Target Duration</dt>
-            <dd>{{ setlist.target_duration_label }}</dd>
-        </div>
-        <div>
-            <dt>Songs</dt>
-            <dd>{{ setlist.entries|length }}</dd>
-        </div>
-        <div>
-            <dt>Created</dt>
-            <dd>{{ setlist.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
-        </div>
-    </dl>
-    {% if setlist.entries %}
-        {% set encore_breaks = setlist.encore_break_count %}
-        <p class="hint">
-            Total includes 30-second transitions between songs{% if encore_breaks %} and {{ encore_breaks }} 4-minute encore break{% if encore_breaks != 1 %}s{% endif %}{% endif %}.
-        </p>
-    {% endif %}
+<div class="setlist-workspace">
+    <!-- Left Column: Setlist Details -->
+    <div class="setlist-column">
+        <section class="panel">
+            <header>
+                <h2>{{ setlist.name }}</h2>
+                <div class="panel-actions">
+                    <a class="button" href="{{ url_for('setlists.print_setlist', setlist_id=setlist.id) }}" target="_blank" rel="noopener">
+                        Generate PDF
+                    </a>
+                    <form method="post" action="{{ url_for('setlists.delete_setlist', setlist_id=setlist.id) }}" onsubmit="return confirm('Delete this setlist?');">
+                        <button type="submit" class="danger">Delete</button>
+                    </form>
+                </div>
+            </header>
+            {% if setlist.description %}
+                <p class="setlist-description">{{ setlist.description }}</p>
+            {% endif %}
+            <dl class="setlist-meta">
+                <div>
+                    <dt>Total Duration</dt>
+                    <dd>{{ setlist.total_duration_label }}</dd>
+                </div>
+                <div>
+                    <dt>Target Duration</dt>
+                    <dd>{{ setlist.target_duration_label }}</dd>
+                </div>
+                <div>
+                    <dt>Songs</dt>
+                    <dd>{{ setlist.entries|length }}</dd>
+                </div>
+                {% if setlist.show_date %}
+                <div>
+                    <dt>Show Date</dt>
+                    <dd>{{ setlist.show_date.strftime('%b %d, %Y') }}</dd>
+                </div>
+                {% endif %}
+                <div>
+                    <dt>Created</dt>
+                    <dd>{{ setlist.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
+                </div>
+            </dl>
+            {% if setlist.entries %}
+                {% set encore_breaks = setlist.encore_break_count %}
+                <p class="hint">
+                    Total includes 30-second transitions between songs{% if encore_breaks %} and {{ encore_breaks }} 4-minute encore break{% if encore_breaks != 1 %}s{% endif %}{% endif %}.
+                </p>
+            {% endif %}
 
-    {% if setlist.target_duration_seconds and setlist.entries %}
-        <form method="post" action="{{ url_for('setlists.regenerate_setlist', setlist_id=setlist.id) }}" class="inline-form" onsubmit="return confirm('Regenerate using your target duration? This replaces the current order.');">
-            <button type="submit">Regenerate Automatically</button>
-        </form>
-    {% endif %}
-</section>
+            {% if setlist.target_duration_seconds and setlist.entries %}
+                <form method="post" action="{{ url_for('setlists.regenerate_setlist', setlist_id=setlist.id) }}" class="inline-form" onsubmit="return confirm('Regenerate using your target duration? This replaces the current order.');">
+                    <button type="submit">Regenerate Automatically</button>
+                </form>
+            {% endif %}
+            {% if setlist.entries %}
+                <form method="post" action="{{ url_for('setlists.add_encore_break', setlist_id=setlist.id) }}" class="inline-form">
+                    <button type="submit">Add Encore Break</button>
+                </form>
+            {% endif %}
+        </section>
 
-<section class="panel">
-    <header>
-        <h3>Order</h3>
-    </header>
+        <section class="panel">
+            <header>
+                <h3>Order</h3>
+            </header>
 
-    {% if setlist.entries %}
-        <table class="data-table" data-setlist-table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th class="sr-only">Reorder</th>
-                    <th>Title</th>
-                    <th>Print Name</th>
-                    <th>Artist</th>
-                    <th>Tags</th>
-                    <th>Duration</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody data-setlist-body data-reorder-url="{{ url_for('setlists.reorder_setlist', setlist_id=setlist.id) }}">
-                {% set encore_counter = namespace(value=0) %}
-                {% for entry in setlist.entries %}
-                    {% if entry.starts_encore and loop.index > 1 %}
-                        {% set encore_counter.value = encore_counter.value + 1 %}
-                        <tr class="encore-break">
-                            <td colspan="8">Encore {{ encore_counter.value }}</td>
+            {% if setlist.entries %}
+                <table class="data-table" data-setlist-table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th class="sr-only">Reorder</th>
+                            <th>Title</th>
+                            <th>Artist</th>
+                            <th>Tags</th>
+                            <th>Duration</th>
+                            <th></th>
                         </tr>
-                    {% endif %}
-                    <tr data-entry-id="{{ entry.id }}">
-                        <td data-position-cell>{{ loop.index }}</td>
-                        <td class="drag-cell">
-                            <button type="button" data-drag-handle draggable="true" class="drag-handle" aria-label="Drag to reorder">☰</button>
-                        </td>
-                        <td>{{ entry.song.title }}</td>
-                        <td>
-                            {% if entry.song.alias %}
-                                {{ entry.song.alias }}
-                            {% else %}
-                                —
+                    </thead>
+                    <tbody data-setlist-body data-reorder-url="{{ url_for('setlists.reorder_setlist', setlist_id=setlist.id) }}">
+                        {% set encore_counter = namespace(value=0) %}
+                        {% for entry in setlist.entries %}
+                            {% if entry.starts_encore and loop.index > 1 %}
+                                {% set encore_counter.value = encore_counter.value + 1 %}
+                                <tr class="encore-break">
+                                    <td colspan="7">Encore {{ encore_counter.value }}</td>
+                                </tr>
                             {% endif %}
-                        </td>
-                        <td>{{ entry.song.artist }}</td>
-                        <td>
-                            {% if entry.song.tag_summary %}
-                                {{ entry.song.tag_summary }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td>{{ entry.song.duration_label }}</td>
-                        <td class="actions">
-                            <form method="post" action="{{ url_for('setlists.move_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}">
-                                <button type="submit" name="direction" value="up" {% if loop.first %}disabled{% endif %}>↑</button>
-                                <button type="submit" name="direction" value="down" {% if loop.last %}disabled{% endif %}>↓</button>
-                            </form>
-                            <form method="post" action="{{ url_for('setlists.toggle_encore_entry', setlist_id=setlist.id, entry_id=entry.id) }}">
-                                {% if entry.starts_encore %}
-                                    <button type="submit" class="link-button">Remove Encore Break</button>
-                                {% else %}
-                                    <button type="submit" class="link-button" {% if loop.first %}disabled title="Encore break must follow at least one song."{% endif %}>Add Encore Break</button>
-                                {% endif %}
-                            </form>
-                            <form method="post" action="{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}" onsubmit="return confirm('Remove this song from the setlist?');">
-                                <button type="submit" class="link-button">
-                                    <span aria-hidden="true">🗑️</span>
-                                    <span class="sr-only">Remove from setlist</span>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No songs in this setlist yet.</p>
-    {% endif %}
-</section>
+                            <tr data-entry-id="{{ entry.id }}">
+                                <td data-position-cell>{{ loop.index }}</td>
+                                <td class="drag-cell">
+                                    <button type="button" data-drag-handle draggable="true" class="drag-handle" aria-label="Drag to reorder">☰</button>
+                                </td>
+                                <td>{{ entry.song.title }}</td>
+                                <td>{{ entry.song.artist }}</td>
+                                <td>
+                                    {% if entry.song.tag_summary %}
+                                        {{ entry.song.tag_summary }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{{ entry.song.duration_label }}</td>
+                                <td class="actions">
+                                    <div class="dropdown">
+                                        <button class="dropdown-toggle" onclick="toggleDropdown(event, 'dropdown-{{ entry.id }}')">
+                                            <span aria-hidden="true">⋯</span>
+                                            <span class="sr-only">Actions</span>
+                                        </button>
+                                        <div id="dropdown-{{ entry.id }}" class="dropdown-menu">
+                                            {% if entry.starts_encore %}
+                                                <button class="dropdown-item" onclick="removeEncore('{{ url_for('setlists.remove_encore_break', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                                    <span class="dropdown-icon">🎭</span>
+                                                    Remove Encore Break
+                                                </button>
+                                            {% else %}
+                                                <button class="dropdown-item" onclick="addEncore('{{ url_for('setlists.add_encore_break_at_position', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                                    <span class="dropdown-icon">➕</span>
+                                                    Add Encore Break
+                                                </button>
+                                            {% endif %}
+                                            <button class="dropdown-item danger-item" onclick="removeSong('{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                                <span class="dropdown-icon">🗑️</span>
+                                                Remove Song
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No songs in this setlist yet. Add songs from the library on the right to get started.</p>
+            {% endif %}
+        </section>
+    </div>
 
-<section class="panel secondary">
-    <header>
-        <h3>Add Song</h3>
-    </header>
-    {% if available_songs %}
-        <form method="post" action="{{ url_for('setlists.add_song_to_setlist', setlist_id=setlist.id) }}">
-            <label>
-                Song
-                <select name="song_id" required>
-                    <option value="">Choose a song…</option>
-                    {% for song in available_songs %}
-                        <option value="{{ song.id }}">
-                            {{ song.title }}{% if song.alias %} → {{ song.alias }}{% endif %} — {{ song.artist }} ({{ song.duration_label }}){% if song.tag_summary %} [{{ song.tag_summary }}]{% endif %}
-                        </option>
-                    {% endfor %}
-                </select>
-            </label>
-            <button type="submit">Add To Setlist</button>
-        </form>
-    {% else %}
-        <p>Every song in your library is already in this setlist. <a href="{{ url_for('setlists.songs') }}">Add more songs</a>.</p>
-    {% endif %}
-</section>
+    <!-- Right Column: Song Library -->
+    <div class="library-column">
+        <section class="panel secondary">
+            <header>
+                <h3>Song Library</h3>
+            </header>
+            {% if available_songs %}
+                <div class="songs-browser" data-setlist-id="{{ setlist.id }}">
+                    <div class="search-controls">
+                        <input type="text" id="song-search" placeholder="Search songs by title, artist, or genre..." class="search-input">
+                        <div class="filter-controls">
+                            <select id="sort-select" class="filter-select">
+                                <option value="title">Sort by Title</option>
+                                <option value="artist">Sort by Artist</option>
+                                <option value="duration">Sort by Duration</option>
+                                <option value="energy">Sort by Energy</option>
+                                <option value="plays">Sort by Plays</option>
+                                <option value="last_played">Sort by Last Played</option>
+                            </select>
+                            <select id="genre-filter" class="filter-select">
+                                <option value="">All Genres</option>
+                            </select>
+                            <select id="tag-filter" class="filter-select">
+                                <option value="">All Tags</option>
+                                <option value="M">Multitrack</option>
+                                <option value="CVR">Cover</option>
+                                <option value="VO">Vocals Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="available-songs-list" id="available-songs-container">
+                        <!-- Songs will be loaded here via JavaScript -->
+                    </div>
+                </div>
+            {% else %}
+                <p>Every song in your library is already in this setlist. <a href="{{ url_for('setlists.songs') }}">Add more songs</a>.</p>
+            {% endif %}
+        </section>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='setlist.js') }}" defer></script>
+<script src="{{ url_for('static', filename='song-browser.js') }}" defer></script>
+<script>
+// Dropdown menu functionality
+function toggleDropdown(event, dropdownId) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const dropdown = document.getElementById(dropdownId);
+    const allDropdowns = document.querySelectorAll('.dropdown-menu');
+
+    // Close all other dropdowns
+    allDropdowns.forEach(d => {
+        if (d.id !== dropdownId) {
+            d.classList.remove('show');
+        }
+    });
+
+    // Toggle current dropdown
+    dropdown.classList.toggle('show');
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(event) {
+    const dropdowns = document.querySelectorAll('.dropdown-menu');
+    dropdowns.forEach(dropdown => {
+        if (!dropdown.contains(event.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+});
+
+// Handle song and encore removal
+function removeSong(url) {
+    if (confirm('Remove this song from the setlist?')) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Error removing song: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Fallback to form submission
+            window.location.href = url;
+        });
+    }
+}
+
+function removeEncore(url) {
+    if (confirm('Remove this encore break?')) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Error removing encore: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Fallback to form submission
+            window.location.href = url;
+        });
+    }
+}
+
+function addEncore(url) {
+    if (confirm('Add an encore break after this song?')) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Error adding encore: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Fallback to form submission
+            window.location.href = url;
+        });
+    }
+}
+
+// Close dropdowns on escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const dropdowns = document.querySelectorAll('.dropdown-menu.show');
+        dropdowns.forEach(dropdown => {
+            dropdown.classList.remove('show');
+        });
+    }
+});
+</script>
 {% endblock %}
