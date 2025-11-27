@@ -1,0 +1,16 @@
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite
+instance/*.db
+instance/*.sqlite
+setlists.db
+.DS_Store
+venv/
+env/
+.venv/
+dist/
+build/
+*.log
