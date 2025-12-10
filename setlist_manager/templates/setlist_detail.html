@@ -369,8 +369,15 @@ function removeSong(url) {
             },
             body: ''
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Remove song response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('Remove song response data:', data);
             if (data.status === 'success') {
                 // Remove the row immediately without page reload
                 const row = event.target.closest('tr');
