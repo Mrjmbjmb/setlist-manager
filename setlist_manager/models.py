@@ -136,3 +136,33 @@ class SetlistSong(db.Model):
 
     setlist = db.relationship("Setlist", back_populates="entries")
     song = db.relationship("Song", back_populates="setlist_entries", lazy="joined")
+
+
+class Setting(db.Model):
+    __tablename__ = "settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(80), unique=True, nullable=False)
+    value = db.Column(db.Text, nullable=False)
+    description = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    @classmethod
+    def get(cls, key, default=None):
+        setting = cls.query.filter_by(key=key).first()
+        return setting.value if setting else default
+
+    @classmethod
+    def set(cls, key, value, description=None):
+        setting = cls.query.filter_by(key=key).first()
+        if setting:
+            setting.value = value
+            if description:
+                setting.description = description
+            setting.updated_at = datetime.utcnow()
+        else:
+            setting = cls(key=key, value=value, description=description)
+            db.session.add(setting)
+        db.session.commit()
+        return setting

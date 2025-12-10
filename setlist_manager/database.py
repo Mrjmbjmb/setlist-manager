@@ -10,6 +10,7 @@ def init_db(app):
         db.create_all()
         _ensure_song_columns()
         _ensure_setlist_song_columns()
+        _ensure_settings_table()
 
 
 def _ensure_song_columns() -> None:
@@ -54,4 +55,28 @@ def _ensure_setlist_song_columns() -> None:
             altered = True
 
     if altered:
+        db.session.commit()
+
+
+def _ensure_settings_table() -> None:
+    """Create the settings table if it doesn't exist."""
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+
+    if "settings" not in tables:
+        # Create the settings table
+        db.session.execute(text("""
+            CREATE TABLE settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key VARCHAR(80) UNIQUE NOT NULL,
+                value TEXT NOT NULL,
+                description VARCHAR(255),
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+
+        # Create index on key for faster lookups
+        db.session.execute(text("CREATE INDEX ix_settings_key ON settings (key)"))
+
         db.session.commit()

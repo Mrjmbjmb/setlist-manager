@@ -4,6 +4,7 @@ import json
 import re
 from typing import Optional
 from datetime import datetime
+import requests
 
 from flask import (
     Blueprint,
@@ -20,7 +21,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from .database import db
-from .models import Setlist, SetlistSong, Song
+from .models import Setlist, SetlistSong, Song, Setting
 from .services import generate_setlist
 
 bp = Blueprint("setlists", __name__)
@@ -35,6 +36,73 @@ TAG_ATTRIBUTE_MAP = {
 def _apply_tags_to_song(song: Song, selected_tags: set[str]) -> None:
     for code, attribute in TAG_ATTRIBUTE_MAP.items():
         setattr(song, attribute, code in selected_tags)
+
+
+def _format_setlist_for_timer(setlist: Setlist) -> dict:
+    """Format setlist data for timer API according to import-examples.md format"""
+    main_set_songs = []
+    encore_songs = []
+    in_encore = False
+
+    for entry in setlist.entries:
+        if entry.song:
+            song_title = entry.song.print_title
+            if entry.starts_encore and not in_encore:
+                # First encore song
+                in_encore = True
+                encore_songs.append(song_title)
+            elif entry.starts_encore and in_encore:
+                # Continue encore
+                encore_songs.append(song_title)
+            else:
+                # Main set song
+                main_set_songs.append(song_title)
+
+    # Calculate durations
+    main_set_duration = 0
+    encore_duration = 0
+    in_encore = False
+
+    for entry in setlist.entries:
+        if entry.song:
+            duration = entry.song.duration_seconds
+            if entry.starts_encore and not in_encore:
+                # First encore song - include encore break
+                main_set_duration += setlist.ENCORE_BREAK_SECONDS
+                encore_duration += duration
+                in_encore = True
+            elif entry.starts_encore and in_encore:
+                # Continue encore
+                encore_duration += duration
+            else:
+                # Main set song
+                main_set_duration += duration
+                if entry != setlist.entries[-1]:
+                    # Add transition time if not last song in main set
+                    main_set_duration += setlist.BETWEEN_SONG_SECONDS
+
+    # Format duration as hh:mm:ss
+    def format_duration(seconds):
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+    result = {}
+
+    if main_set_songs:
+        result["mainSet"] = {
+            "songs": main_set_songs,
+            "duration": format_duration(main_set_duration)
+        }
+
+    if encore_songs:
+        result["encore"] = {
+            "songs": encore_songs,
+            "duration": format_duration(encore_duration)
+        }
+
+    return result
 
 
 def _collect_song_form_data(form) -> tuple[Optional[dict], Optional[str]]:
@@ -1321,3 +1389,74 @@ def import_database():
         db.session.rollback()
         flash(f"Error importing database: {str(e)}", "error")
         return redirect(request.url)
+
+
+# Settings routes
+@bp.get("/settings")
+def settings():
+    timer_url = Setting.get("timer_api_url", "")
+    return render_template("settings.html", timer_url=timer_url)
+
+
+@bp.post("/settings")
+def update_settings():
+    timer_url = request.form.get("timer_api_url", "").strip()
+
+    if timer_url and not timer_url.startswith(("http://", "https://")):
+        flash("Timer API URL must start with http:// or https://", "error")
+        return render_template("settings.html", timer_url=timer_url)
+
+    Setting.set("timer_api_url", timer_url, "Timer API endpoint URL")
+    flash("Settings saved successfully!", "success")
+    return redirect(url_for("setlists.settings"))
+
+
+@bp.post("/setlists/<int:setlist_id>/send-to-timer")
+def send_to_timer(setlist_id: int):
+    # Get setlist with all entries
+    setlist = (
+        Setlist.query.options(
+            joinedload(Setlist.entries).joinedload(SetlistSong.song)
+        )
+        .get_or_404(setlist_id)
+    )
+
+    # Check if timer API URL is configured
+    timer_url = Setting.get("timer_api_url")
+    if not timer_url:
+        return jsonify({
+            "success": False,
+            "error": "Timer API URL not configured. Please configure it in Settings."
+        }), 400
+
+    # Format setlist data for timer
+    timer_data = _format_setlist_for_timer(setlist)
+
+    # Send to timer API
+    try:
+        response = requests.post(
+            timer_url,
+            json=timer_data,
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+
+        # Check if the request was successful
+        response.raise_for_status()
+
+        return jsonify({
+            "success": True,
+            "message": "Setlist sent to timer successfully",
+            "data_sent": timer_data
+        })
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "success": False,
+            "error": f"Failed to send to timer: {str(e)}"
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Unexpected error: {str(e)}"
+        }), 500

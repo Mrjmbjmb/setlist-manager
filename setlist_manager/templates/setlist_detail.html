@@ -13,6 +13,9 @@
                     <a class="button" href="{{ url_for('setlists.print_setlist', setlist_id=setlist.id) }}" target="_blank" rel="noopener">
                         Generate PDF
                     </a>
+                    <button type="button" class="button" onclick="sendToTimer({{ setlist.id }})" id="sendToTimerBtn">
+                        Send to Timer
+                    </button>
                     <form method="post" action="{{ url_for('setlists.delete_setlist', setlist_id=setlist.id) }}" onsubmit="return confirm('Delete this setlist?');">
                         <button type="submit" class="danger">Delete</button>
                     </form>
@@ -187,6 +190,42 @@
 <script src="{{ url_for('static', filename='setlist.js') }}" defer></script>
 <script src="{{ url_for('static', filename='song-browser.js') }}" defer></script>
 <script>
+// Send to Timer functionality
+function sendToTimer(setlistId) {
+    const btn = document.getElementById('sendToTimerBtn');
+    const originalText = btn.textContent;
+
+    btn.textContent = 'Sending...';
+    btn.disabled = true;
+
+    fetch(`/setlists/${setlistId}/send-to-timer`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            btn.textContent = 'Sent!';
+            btn.classList.add('success');
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+                btn.classList.remove('success');
+            }, 3000);
+        } else {
+            throw new Error(data.error || 'Failed to send to timer');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error sending to timer: ' + error.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    });
+}
+
 // Dropdown menu functionality
 function toggleDropdown(event, dropdownId) {
     event.preventDefault();
