@@ -209,12 +209,12 @@
                                                     Remove Encore Break
                                                 </button>
                                             {% else %}
-                                                <button class="dropdown-item" onclick="addEncore('{{ url_for('setlists.add_encore_break_at_position', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                                <button class="dropdown-item" onclick="addEncore('{{ url_for('setlists.add_encore_break_at_position', setlist_id=setlist.id, entry_id=entry.id) }}', event)">
                                                     <span class="dropdown-icon">➕</span>
                                                     Add Encore Break
                                                 </button>
                                             {% endif %}
-                                            <button class="dropdown-item danger-item" onclick="removeSong('{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                            <button class="dropdown-item danger-item" onclick="removeSong('{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}', event)">
                                                 <span class="dropdown-icon">🗑️</span>
                                                 Remove Song
                                             </button>
@@ -343,7 +343,7 @@ document.addEventListener('click', function(event) {
 });
 
 // Handle song and encore removal
-function removeSong(url) {
+function removeSong(url, event) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -464,7 +464,10 @@ function removeEncore(url) {
     }
 }
 
-function addEncore(url) {
+function addEncore(url, event) {
+    event.preventDefault();
+    event.stopPropagation();
+
     if (confirm('Add an encore break after this song?')) {
         // Show loading state - find the dropdown toggle button
         const dropdownItem = event.target.closest('.dropdown-item');
