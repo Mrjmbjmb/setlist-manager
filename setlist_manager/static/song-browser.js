@@ -160,6 +160,11 @@
     // Add song to setlist via API
     const addSongToSetlist = async (songId) => {
         try {
+            const button = document.querySelector(`[data-song-id="${songId}"] .add-button`);
+            const originalText = button.textContent;
+            button.textContent = "Adding...";
+            button.disabled = true;
+
             const response = await fetch(`/setlists/${setlistId}/add-song`, {
                 method: "POST",
                 headers: {
@@ -169,22 +174,99 @@
                 body: `song_id=${songId}`
             });
 
-            if (response.ok) {
-                // Remove song from available list
+            const data = await response.json();
+
+            if (response.ok && data.status === "success") {
+                // Remove song from available list immediately
                 availableSongs = availableSongs.filter(song => song.id != songId);
                 filterAndSortSongs();
 
-                // Show success message
-                showNotification("Song added to setlist!", "success");
+                // Update the setlist metadata in the UI without page reload
+                updateSetlistMetadata(data);
 
-                // Refresh the page to update the setlist order table
-                setTimeout(() => window.location.reload(), 1000);
+                // Add the new song to the setlist table (if table exists)
+                addSongToSetlistTable(data);
+
+                // Log success for debugging
+                console.log("Song added successfully:", data);
+
             } else {
-                showNotification("Error adding song to setlist", "error");
+                button.textContent = originalText;
+                button.disabled = false;
+                console.error("Server response:", data);
             }
         } catch (error) {
             console.error("Error adding song:", error);
-            showNotification("Error adding song to setlist", "error");
+            const button = document.querySelector(`[data-song-id="${songId}"] .add-button`);
+            if (button) {
+                button.textContent = "Add";
+                button.disabled = false;
+            }
+        }
+    };
+
+    // Update setlist metadata in the UI
+    const updateSetlistMetadata = (data) => {
+        // Update song count - find the "Songs" dt and get its dd
+        const dts = document.querySelectorAll("dt");
+        dts.forEach(dt => {
+            if (dt.textContent.includes("Songs")) {
+                const dd = dt.nextElementSibling;
+                if (dd && dd.tagName === "DD") {
+                    dd.textContent = data.new_song_count;
+                }
+            }
+            if (dt.textContent.includes("Total Duration")) {
+                const dd = dt.nextElementSibling;
+                if (dd && dd.tagName === "DD") {
+                    dd.textContent = data.new_duration;
+                }
+            }
+        });
+    };
+
+    // Add song to setlist table
+    const addSongToSetlistTable = (data) => {
+        const tableBody = document.querySelector("[data-setlist-body]");
+        if (!tableBody) return;
+
+        // Create new row for the added song
+        const newRow = document.createElement("tr");
+        newRow.dataset.entryId = data.entry_id;
+        newRow.innerHTML = `
+            <td data-position-cell>${data.position}</td>
+            <td class="drag-cell">
+                <button type="button" data-drag-handle draggable="true" class="drag-handle" aria-label="Drag to reorder">☰</button>
+            </td>
+            <td>${data.song_title}</td>
+            <td>${data.song_artist}</td>
+            <td>—</td>
+            <td>${data.song_duration}</td>
+            <td class="actions">
+                <div class="dropdown">
+                    <button class="dropdown-toggle" onclick="toggleDropdown(event, 'dropdown-${data.entry_id}')">
+                        <span aria-hidden="true">⋯</span>
+                        <span class="sr-only">Actions</span>
+                    </button>
+                    <div id="dropdown-${data.entry_id}" class="dropdown-menu">
+                        <button class="dropdown-item" onclick="addEncore('/setlists/${setlistId}/entries/${data.entry_id}/add-encore')">
+                            <span class="dropdown-icon">➕</span>
+                            Add Encore Break
+                        </button>
+                        <button class="dropdown-item danger-item" onclick="removeSong('/setlists/${setlistId}/entries/${data.entry_id}')">
+                            <span class="dropdown-icon">🗑️</span>
+                            Remove Song
+                        </button>
+                    </div>
+                </div>
+            </td>
+        `;
+
+        tableBody.appendChild(newRow);
+
+        // Re-initialize drag and drop if needed
+        if (window.initializeSortableTable) {
+            window.initializeSortableTable();
         }
     };
 
@@ -208,4 +290,7 @@
 
     // Initialize
     loadAvailableSongs();
+
+    // Make refreshAvailableSongs globally available
+    window.refreshAvailableSongs = loadAvailableSongs;
 })();

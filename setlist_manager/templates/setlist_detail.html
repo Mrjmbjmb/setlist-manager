@@ -345,6 +345,12 @@ document.addEventListener('click', function(event) {
 // Handle song and encore removal
 function removeSong(url) {
     if (confirm('Remove this song from the setlist?')) {
+        // Show loading state
+        const button = event.target.closest('button');
+        const originalText = button.textContent;
+        button.textContent = 'Removing...';
+        button.disabled = true;
+
         fetch(url, {
             method: 'POST',
             headers: {
@@ -355,17 +361,49 @@ function removeSong(url) {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                window.location.reload();
+                // Remove the row immediately without page reload
+                const row = button.closest('tr');
+                row.remove();
+
+                // Update setlist metadata
+                updateSetlistMetadataFast(data);
+
+                // Add song back to available list
+                if (window.refreshAvailableSongs) {
+                    window.refreshAvailableSongs();
+                }
             } else {
-                alert('Error removing song: ' + data.message);
+                button.textContent = originalText;
+                button.disabled = false;
             }
         })
         .catch(error => {
             console.error('Error:', error);
+            button.textContent = originalText;
+            button.disabled = false;
             // Fallback to form submission
             window.location.href = url;
         });
     }
+}
+
+// Fast metadata update for AJAX responses
+function updateSetlistMetadataFast(data) {
+    const dts = document.querySelectorAll("dt");
+    dts.forEach(dt => {
+        if (dt.textContent.includes("Songs")) {
+            const dd = dt.nextElementSibling;
+            if (dd && dd.tagName === "DD") {
+                dd.textContent = data.new_song_count;
+            }
+        }
+        if (dt.textContent.includes("Total Duration")) {
+            const dd = dt.nextElementSibling;
+            if (dd && dd.tagName === "DD") {
+                dd.textContent = data.new_duration;
+            }
+        }
+    });
 }
 
 function removeEncore(url) {
@@ -381,8 +419,6 @@ function removeEncore(url) {
         .then(data => {
             if (data.status === 'success') {
                 window.location.reload();
-            } else {
-                alert('Error removing encore: ' + data.message);
             }
         })
         .catch(error => {
@@ -395,6 +431,12 @@ function removeEncore(url) {
 
 function addEncore(url) {
     if (confirm('Add an encore break after this song?')) {
+        // Show loading state
+        const button = event.target.closest('button');
+        const originalText = button.textContent;
+        button.textContent = 'Adding...';
+        button.disabled = true;
+
         fetch(url, {
             method: 'POST',
             headers: {
@@ -405,13 +447,17 @@ function addEncore(url) {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
+                // Reload page for encore changes (they affect layout significantly)
                 window.location.reload();
             } else {
-                alert('Error adding encore: ' + data.message);
+                button.textContent = originalText;
+                button.disabled = false;
             }
         })
         .catch(error => {
             console.error('Error:', error);
+            button.textContent = originalText;
+            button.disabled = false;
             // Fallback to form submission
             window.location.href = url;
         });

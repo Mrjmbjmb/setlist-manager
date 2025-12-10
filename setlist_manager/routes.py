@@ -859,15 +859,25 @@ def add_song_to_setlist(setlist_id: int):
     db.session.add(entry)
     db.session.commit()
 
-    # Update cached values
-    setlist.update_cached_values()
-
     # Handle AJAX response
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # Update cached values
+        setlist.update_cached_values()
+
         return jsonify({
             "status": "success",
-            "message": f'Added "{song.title}" to {setlist.name}.'
+            "message": f'Added "{song.title}" to {setlist.name}.',
+            "new_song_count": setlist.cached_song_count,
+            "new_duration": setlist.cached_total_duration_label,
+            "entry_id": entry.id,
+            "song_title": song.title,
+            "song_artist": song.artist,
+            "song_duration": song.duration_label,
+            "position": position
         })
+    else:
+        # Use full update for non-AJAX requests
+        setlist.update_cached_values()
 
     flash(f'Added "{song.title}" to {setlist.name}.', "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
@@ -918,19 +928,27 @@ def remove_setlist_entry(setlist_id: int, entry_id: int):
         abort(404)
 
     song_title = entry.song.title
+    song_duration = entry.song.duration_seconds
+    was_last = (entry.position == len(setlist.entries))
+
     db.session.delete(entry)
     db.session.commit()
     _normalize_positions(setlist_id)
 
-    # Update cached values
-    setlist.update_cached_values()
-
     # Handle AJAX request
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        # Update cached values
+        setlist.update_cached_values()
+
         return jsonify({
             "status": "success",
-            "message": f'Removed "{song_title}" from setlist.'
+            "message": f'Removed "{song_title}" from setlist.',
+            "new_song_count": setlist.cached_song_count,
+            "new_duration": setlist.cached_total_duration_label
         })
+    else:
+        # Use full update for non-AJAX requests
+        setlist.update_cached_values()
 
     flash("Removed song from setlist.", "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))

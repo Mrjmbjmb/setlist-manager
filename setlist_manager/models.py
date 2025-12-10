@@ -127,6 +127,27 @@ class Setlist(db.Model):
         self.cached_total_duration_seconds = self.total_duration_seconds
         db.session.commit()
 
+    def increment_cached_values(self, added_duration_seconds: int) -> None:
+        """Increment cached values when a song is added - much faster than full recalculation."""
+        # Ensure cached values are initialized
+        if self.cached_song_count == 0 and len(self.entries) > 1:
+            # Initialize with correct count if this is the first operation after migration
+            self.cached_song_count = len(self.entries)
+            self.cached_total_duration_seconds = self.total_duration_seconds
+
+        self.cached_song_count += 1
+        self.cached_total_duration_seconds += added_duration_seconds + self.between_song_seconds
+        db.session.commit()
+
+    def decrement_cached_values(self, removed_duration_seconds: int, was_last: bool = False) -> None:
+        """Decrement cached values when a song is removed - much faster than full recalculation."""
+        self.cached_song_count -= 1
+        transition_time = 0 if was_last else self.between_song_seconds
+        self.cached_total_duration_seconds -= (removed_duration_seconds + transition_time)
+        if self.cached_total_duration_seconds < 0:
+            self.cached_total_duration_seconds = 0
+        db.session.commit()
+
     @property
     def has_encore_break(self) -> bool:
         return self.encore_break_count > 0
