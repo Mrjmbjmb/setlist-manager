@@ -45,6 +45,29 @@
                     <dd>{{ setlist.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
                 </div>
             </dl>
+            <form
+                method="post"
+                action="{{ url_for('setlists.update_show_date', setlist_id=setlist.id) }}"
+                class="show-date-form"
+            >
+                <label for="show-date-input">
+                    Show Date
+                    <input
+                        type="date"
+                        id="show-date-input"
+                        name="show_date"
+                        value="{{ setlist.show_date.isoformat() if setlist.show_date else '' }}"
+                    >
+                </label>
+                <div class="show-date-buttons">
+                    <button type="submit" name="action" value="save">Save Date</button>
+                    {% if setlist.show_date %}
+                        <button type="submit" name="action" value="clear" class="secondary-button">
+                            Clear Date
+                        </button>
+                    {% endif %}
+                </div>
+            </form>
             {% if setlist.entries %}
                 {% set encore_breaks = setlist.encore_break_count %}
                 <p class="hint">
@@ -94,7 +117,9 @@
                             <tr data-entry-id="{{ entry.id }}">
                                 <td data-position-cell>{{ loop.index }}</td>
                                 <td class="drag-cell">
-                                    <button type="button" data-drag-handle draggable="true" class="drag-handle" aria-label="Drag to reorder">☰</button>
+                                    <button type="button" data-drag-handle draggable="true" class="drag-handle" aria-label="Drag to reorder">
+                                        ☰
+                                    </button>
                                 </td>
                                 <td>{{ entry.song.title }}</td>
                                 <td>{{ entry.song.artist }}</td>
@@ -107,24 +132,54 @@
                                 </td>
                                 <td>{{ entry.song.duration_label }}</td>
                                 <td class="actions">
-                                    <div class="dropdown">
-                                        <button class="dropdown-toggle" onclick="toggleDropdown(event, 'dropdown-{{ entry.id }}')">
+                                    <div class="dropdown entry-actions">
+                                        <button
+                                            type="button"
+                                            class="dropdown-toggle"
+                                            data-entry-menu-toggle
+                                            aria-haspopup="true"
+                                            aria-expanded="false"
+                                            aria-controls="entry-menu-{{ entry.id }}"
+                                        >
                                             <span aria-hidden="true">⋯</span>
                                             <span class="sr-only">Actions</span>
                                         </button>
-                                        <div id="dropdown-{{ entry.id }}" class="dropdown-menu">
+                                        <div
+                                            id="entry-menu-{{ entry.id }}"
+                                            class="dropdown-menu"
+                                            data-entry-menu
+                                            role="menu"
+                                        >
                                             {% if entry.starts_encore %}
-                                                <button class="dropdown-item" onclick="removeEncore('{{ url_for('setlists.remove_encore_break', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    data-entry-action="remove-encore"
+                                                    data-action-url="{{ url_for('setlists.remove_encore_break', setlist_id=setlist.id, entry_id=entry.id) }}"
+                                                    role="menuitem"
+                                                >
                                                     <span class="dropdown-icon">🎭</span>
                                                     Remove Encore Break
                                                 </button>
                                             {% else %}
-                                                <button class="dropdown-item" onclick="addEncore('{{ url_for('setlists.add_encore_break_at_position', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item"
+                                                    data-entry-action="add-encore"
+                                                    data-action-url="{{ url_for('setlists.add_encore_break_at_position', setlist_id=setlist.id, entry_id=entry.id) }}"
+                                                    role="menuitem"
+                                                >
                                                     <span class="dropdown-icon">➕</span>
                                                     Add Encore Break
                                                 </button>
                                             {% endif %}
-                                            <button class="dropdown-item danger-item" onclick="removeSong('{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}')">
+                                            <button
+                                                type="button"
+                                                class="dropdown-item danger-item"
+                                                data-entry-action="remove-song"
+                                                data-action-url="{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}"
+                                                role="menuitem"
+                                            >
                                                 <span class="dropdown-icon">🗑️</span>
                                                 Remove Song
                                             </button>
@@ -186,120 +241,4 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='setlist.js') }}" defer></script>
 <script src="{{ url_for('static', filename='song-browser.js') }}" defer></script>
-<script>
-// Dropdown menu functionality
-function toggleDropdown(event, dropdownId) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const dropdown = document.getElementById(dropdownId);
-    const allDropdowns = document.querySelectorAll('.dropdown-menu');
-
-    // Close all other dropdowns
-    allDropdowns.forEach(d => {
-        if (d.id !== dropdownId) {
-            d.classList.remove('show');
-        }
-    });
-
-    // Toggle current dropdown
-    dropdown.classList.toggle('show');
-}
-
-// Close dropdowns when clicking outside
-document.addEventListener('click', function(event) {
-    const dropdowns = document.querySelectorAll('.dropdown-menu');
-    dropdowns.forEach(dropdown => {
-        if (!dropdown.contains(event.target)) {
-            dropdown.classList.remove('show');
-        }
-    });
-});
-
-// Handle song and encore removal
-function removeSong(url) {
-    if (confirm('Remove this song from the setlist?')) {
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.location.reload();
-            } else {
-                alert('Error removing song: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Fallback to form submission
-            window.location.href = url;
-        });
-    }
-}
-
-function removeEncore(url) {
-    if (confirm('Remove this encore break?')) {
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.location.reload();
-            } else {
-                alert('Error removing encore: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Fallback to form submission
-            window.location.href = url;
-        });
-    }
-}
-
-function addEncore(url) {
-    if (confirm('Add an encore break after this song?')) {
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.location.reload();
-            } else {
-                alert('Error adding encore: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Fallback to form submission
-            window.location.href = url;
-        });
-    }
-}
-
-// Close dropdowns on escape key
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        const dropdowns = document.querySelectorAll('.dropdown-menu.show');
-        dropdowns.forEach(dropdown => {
-            dropdown.classList.remove('show');
-        });
-    }
-});
-</script>
 {% endblock %}

@@ -16,7 +16,7 @@ from flask import (
     url_for,
     send_file,
 )
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import joinedload
 
 from .database import db
@@ -109,7 +109,14 @@ def _parse_duration(value: str) -> Optional[int]:
 
 @bp.route("/")
 def index():
-    setlists = Setlist.query.order_by(Setlist.created_at.desc()).all()
+    show_date_sort = case((Setlist.show_date.is_(None), 1), else_=0)
+    setlists = (
+        Setlist.query.order_by(
+            show_date_sort,
+            Setlist.show_date.desc(),
+            Setlist.created_at.desc(),
+        ).all()
+    )
     total_songs = Song.query.count()
     return render_template("index.html", setlists=setlists, total_songs=total_songs)
 
@@ -471,10 +478,19 @@ def create_setlist():
         description = request.form.get("description", "").strip()
         duration_raw = request.form.get("target_duration", "")
         action = request.form.get("action", "create")
+        show_date_raw = (request.form.get("show_date") or "").strip()
 
         if not name:
             flash("Setlist name is required.", "error")
             return redirect(url_for("setlists.create_setlist"))
+
+        show_date_value = None
+        if show_date_raw:
+            try:
+                show_date_value = datetime.strptime(show_date_raw, "%Y-%m-%d").date()
+            except ValueError:
+                flash("Show date must be in YYYY-MM-DD format.", "error")
+                return redirect(url_for("setlists.create_setlist"))
 
         target_duration = _parse_duration(duration_raw)
 
@@ -482,6 +498,7 @@ def create_setlist():
             name=name,
             description=description or None,
             target_duration_seconds=target_duration,
+            show_date=show_date_value,
         )
         db.session.add(setlist)
         db.session.flush()
@@ -527,6 +544,33 @@ def view_setlist(setlist_id: int):
         setlist=setlist,
         available_songs=available_songs,
     )
+
+
+@bp.post("/setlists/<int:setlist_id>/show-date")
+def update_show_date(setlist_id: int):
+    setlist = Setlist.query.get_or_404(setlist_id)
+    action = request.form.get("action", "save")
+
+    if action == "clear":
+        setlist.show_date = None
+        db.session.commit()
+        flash("Show date cleared.", "success")
+        return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
+
+    show_date_raw = (request.form.get("show_date") or "").strip()
+    if not show_date_raw:
+        flash("Select a show date or clear the existing one.", "error")
+        return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
+
+    try:
+        setlist.show_date = datetime.strptime(show_date_raw, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Show date must be in YYYY-MM-DD format.", "error")
+        return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
+
+    db.session.commit()
+    flash("Show date updated.", "success")
+    return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
 
 @bp.route("/setlists/<int:setlist_id>/available-songs/search")
@@ -772,21 +816,25 @@ def remove_setlist_entry(setlist_id: int, entry_id: int):
         .first()
     )
     if entry is None:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"status": "error", "message": "Song not found in this setlist."}), 404
         abort(404)
 
     song_title = entry.song.title
     db.session.delete(entry)
-    db.session.commit()
+    db.session.flush()
     _normalize_positions(setlist_id)
 
     # Handle AJAX request
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify({
-            "status": "success",
-            "message": f'Removed "{song_title}" from setlist.'
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "message": f'Removed "{song_title}" from the setlist.',
+            }
+        )
 
-    flash("Removed song from setlist.", "success")
+    flash(f'Removed "{song_title}" from the setlist.', "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
 
 
