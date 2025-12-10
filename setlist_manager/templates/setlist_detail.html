@@ -344,9 +344,10 @@ document.addEventListener('click', function(event) {
 
 // Handle song and encore removal
 function removeSong(url) {
+    event.preventDefault();
+    event.stopPropagation();
+
     if (confirm('Remove this song from the setlist?')) {
-        event.preventDefault();
-        event.stopPropagation();
 
         // Show loading state - find the dropdown toggle button
         const dropdownItem = event.target.closest('.dropdown-item');
@@ -405,10 +406,12 @@ function removeSong(url) {
                 button.textContent = originalText;
                 button.disabled = false;
             }
-            // Fallback to form submission
-            window.location.href = url;
+            alert('Error removing song. Please try again.');
         });
+
+        return false;
     }
+    return false;
 }
 
 // Fast metadata update for AJAX responses
