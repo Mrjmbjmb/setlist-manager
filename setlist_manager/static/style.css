@@ -696,6 +696,106 @@ textarea {
     cursor: pointer;
 }
 
+/* Show Time Form Styles */
+.show-time-form {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.show-time-inputs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.show-time-inputs label {
+    display: block;
+    margin: 0;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.show-time-inputs input {
+    margin-top: 0.25rem;
+    width: 100%;
+}
+
+.show-time-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Duration Warning */
+.duration-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+/* Duration Comparison */
+.duration-comparison {
+    background: #f0f8ff;
+    border: 1px solid #d0e4ff;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.duration-comparison h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    color: #0b2c6b;
+}
+
+.duration-comparison dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+}
+
+.duration-comparison dt {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.duration-comparison dd {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.duration-comparison .over-time {
+    color: #dc3545;
+}
+
+.duration-comparison .under-time {
+    color: #28a745;
+}
+
+/* Alert styles */
+.alert {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+    border: 1px solid;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
 .link-button:hover {
     text-decoration: underline;
 }

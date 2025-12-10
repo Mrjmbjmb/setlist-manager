@@ -11,6 +11,7 @@ def init_db(app):
         _ensure_song_columns()
         _ensure_setlist_song_columns()
         _ensure_settings_table()
+        _ensure_setlist_columns()
 
 
 def _ensure_song_columns() -> None:
@@ -79,4 +80,27 @@ def _ensure_settings_table() -> None:
         # Create index on key for faster lookups
         db.session.execute(text("CREATE INDEX ix_settings_key ON settings (key)"))
 
+        db.session.commit()
+
+
+def _ensure_setlist_columns() -> None:
+    """Add new columns to setlists table if they don't exist."""
+    inspector = inspect(db.engine)
+    try:
+        columns = {column["name"] for column in inspector.get_columns("setlists")}
+    except Exception:
+        return
+
+    new_columns = (
+        ("show_start_time", text("ALTER TABLE setlists ADD COLUMN show_start_time TIME")),
+        ("show_end_time", text("ALTER TABLE setlists ADD COLUMN show_end_time TIME")),
+    )
+
+    altered = False
+    for column_name, statement in new_columns:
+        if column_name not in columns:
+            db.session.execute(statement)
+            altered = True
+
+    if altered:
         db.session.commit()

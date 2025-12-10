@@ -30,6 +30,10 @@
                     <dd>{{ setlist.total_duration_label }}</dd>
                 </div>
                 <div>
+                    <dt>Song Duration</dt>
+                    <dd>{{ setlist.song_duration_label }}</dd>
+                </div>
+                <div>
                     <dt>Target Duration</dt>
                     <dd>{{ setlist.target_duration_label }}</dd>
                 </div>
@@ -48,10 +52,10 @@
                     <dd>{{ setlist.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
                 </div>
             </dl>
-            {% if setlist.entries %}
+            {% if setlist.entries and setlist.encore_break_count %}
                 {% set encore_breaks = setlist.encore_break_count %}
                 <p class="hint">
-                    Total includes 30-second transitions between songs{% if encore_breaks %} and {{ encore_breaks }} 4-minute encore break{% if encore_breaks != 1 %}s{% endif %}{% endif %}.
+                    Total includes {{ encore_breaks }} 4-minute encore break{% if encore_breaks != 1 %}s{% endif %}.
                 </p>
             {% endif %}
 
@@ -64,6 +68,89 @@
                 <form method="post" action="{{ url_for('setlists.add_encore_break', setlist_id=setlist.id) }}" class="inline-form">
                     <button type="submit">Add Encore Break</button>
                 </form>
+            {% endif %}
+
+            <!-- Show Date and Time Form -->
+            <form
+                method="post"
+                action="{{ url_for('setlists.update_show_date', setlist_id=setlist.id) }}"
+                class="show-time-form"
+            >
+                <div class="show-time-inputs">
+                    <div>
+                        <label for="show-date-input">
+                            Show Date
+                            <input
+                                type="date"
+                                id="show-date-input"
+                                name="show_date"
+                                value="{{ setlist.show_date.isoformat() if setlist.show_date else '' }}"
+                            >
+                        </label>
+                    </div>
+                    <div>
+                        <label for="show-start-time">
+                            Start Time
+                            <input
+                                type="time"
+                                id="show-start-time"
+                                name="show_start_time"
+                                value="{{ setlist.show_start_time.strftime('%H:%M') if setlist.show_start_time else '' }}"
+                                placeholder="8:00 PM"
+                            >
+                        </label>
+                    </div>
+                    <div>
+                        <label for="show-end-time">
+                            End Time
+                            <input
+                                type="time"
+                                id="show-end-time"
+                                name="show_end_time"
+                                value="{{ setlist.show_end_time.strftime('%H:%M') if setlist.show_end_time else '' }}"
+                                placeholder="9:00 PM"
+                            >
+                        </label>
+                    </div>
+                </div>
+                <div class="show-time-buttons">
+                    <button type="submit" name="action" value="save">Save Times</button>
+                    {% if setlist.show_date or setlist.show_start_time or setlist.show_end_time %}
+                        <button type="submit" name="action" value="clear" class="secondary-button">
+                            Clear All
+                        </button>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- Duration Warning -->
+            {% if setlist.show_duration_warning %}
+                <div class="duration-warning alert">
+                    {{ setlist.show_duration_warning }}
+                </div>
+            {% endif %}
+
+            <!-- Duration Comparison -->
+            {% if setlist.show_start_time and setlist.show_end_time %}
+                <div class="duration-comparison">
+                    <h4>Duration Summary</h4>
+                    <dl>
+                        <div>
+                            <dt>Show Duration</dt>
+                            <dd>{{ setlist.show_duration_label }}</dd>
+                        </div>
+                        <div>
+                            <dt>Setlist Duration</dt>
+                            <dd>{{ setlist.total_duration_label }}</dd>
+                        </div>
+                        <div>
+                            <dt>Difference</dt>
+                            <dd class="{{ 'over-time' if setlist.exceeds_show_duration else 'under-time' }}">
+                                {{ setlist.duration_difference_label }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
             {% endif %}
         </section>
 
@@ -339,6 +426,31 @@ document.addEventListener('keydown', function(event) {
             dropdown.classList.remove('show');
         });
     }
+});
+
+// Set default PM times for empty time fields
+const startTimeInput = document.getElementById('show-start-time');
+const endTimeInput = document.getElementById('show-end-time');
+
+function setDefaultPMTime(input, defaultHour) {
+    if (input && !input.value) {
+        input.value = `${defaultHour.toString().padStart(2, '0')}:00`;
+    }
+}
+
+// Set defaults when fields are focused
+startTimeInput?.addEventListener('focus', function() {
+    setDefaultPMTime(this, 20); // 8:00 PM (20:00)
+});
+
+endTimeInput?.addEventListener('focus', function() {
+    setDefaultPMTime(this, 21); // 9:00 PM (21:00)
+});
+
+// Also set defaults on page load if fields are empty
+document.addEventListener('DOMContentLoaded', function() {
+    setDefaultPMTime(startTimeInput, 20); // 8:00 PM (20:00)
+    setDefaultPMTime(endTimeInput, 21);   // 9:00 PM (21:00)
 });
 </script>
 {% endblock %}
