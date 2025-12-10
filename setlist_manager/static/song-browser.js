@@ -249,11 +249,11 @@
                         <span class="sr-only">Actions</span>
                     </button>
                     <div id="dropdown-${data.entry_id}" class="dropdown-menu">
-                        <button class="dropdown-item" onclick="addEncore('/setlists/${setlistId}/entries/${data.entry_id}/add-encore')">
+                        <button class="dropdown-item" onclick="addEncore('/setlists/${setlistId}/entries/${data.entry_id}/add-encore', event)">
                             <span class="dropdown-icon">➕</span>
                             Add Encore Break
                         </button>
-                        <button class="dropdown-item danger-item" onclick="removeSong('/setlists/${setlistId}/entries/${data.entry_id}')">
+                        <button class="dropdown-item danger-item" onclick="removeSong(this, '/setlists/${setlistId}/entries/${data.entry_id}/remove')">
                             <span class="dropdown-icon">🗑️</span>
                             Remove Song
                         </button>

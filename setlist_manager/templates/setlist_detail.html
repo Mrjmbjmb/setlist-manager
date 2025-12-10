@@ -214,7 +214,7 @@
                                                     Add Encore Break
                                                 </button>
                                             {% endif %}
-                                            <button class="dropdown-item danger-item" onclick="removeSong('{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}', event)">
+                                            <button class="dropdown-item danger-item" onclick="removeSong(this, '{{ url_for('setlists.remove_setlist_entry', setlist_id=setlist.id, entry_id=entry.id) }}')">
                                                 <span class="dropdown-icon">🗑️</span>
                                                 Remove Song
                                             </button>
@@ -342,85 +342,82 @@ document.addEventListener('click', function(event) {
     });
 });
 
-// Handle song and encore removal
-function removeSong(url, event) {
-    event.preventDefault();
-    event.stopPropagation();
+// Handle song removal using the clicked element (no reliance on global event)
+function removeSong(triggerEl, url) {
+    const dropdownItem = triggerEl ? triggerEl.closest('.dropdown-item') : null;
+    const dropdown = dropdownItem ? dropdownItem.parentElement : null;
+    const dropdownToggle = dropdown ? dropdown.querySelector('.dropdown-toggle') : null;
+    const button = dropdownToggle;
 
-    if (confirm('Remove this song from the setlist?')) {
+    const entryMatch = url.match(/entries\/([0-9]+)/);
+    const entryId = entryMatch ? entryMatch[1] : null;
+    const row = triggerEl ? triggerEl.closest('tr') : null;
+    const fallbackRow = entryId ? document.querySelector(`[data-entry-id="${entryId}"]`) : null;
+    const originalText = button ? button.textContent : '';
 
-        // Show loading state - find the dropdown toggle button
-        const dropdownItem = event.target.closest('.dropdown-item');
-        const dropdown = dropdownItem ? dropdownItem.parentElement : null;
-        const dropdownToggle = dropdown ? dropdown.querySelector('.dropdown-toggle') : null;
-        const button = dropdownToggle;
-        const originalText = button ? button.textContent : '';
+    if (!confirm('Remove this song from the setlist?')) {
+        return false;
+    }
 
-        if (button) {
-            button.textContent = 'Removing...';
-            button.disabled = true;
+    if (button) {
+        button.textContent = 'Removing...';
+        button.disabled = true;
+    }
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: ''
+    })
+    .then(response => {
+        console.log('Remove song response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Remove song response data:', data);
+        if (data.status === 'success') {
+            // Remove the row immediately without page reload
+            (row || fallbackRow)?.remove();
 
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: ''
-        })
-        .then(response => {
-            console.log('Remove song response status:', response.status);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            // Update setlist metadata
+            try {
+                updateSetlistMetadataFast(data);
+            } catch (e) {
+                console.error('Error updating metadata:', e);
             }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Remove song response data:', data);
-            if (data.status === 'success') {
-                // Remove the row immediately without page reload
-                const row = event.target.closest('tr');
-                if (row) {
-                    row.remove();
-                }
 
-                // Update setlist metadata
-                try {
-                    updateSetlistMetadataFast(data);
-                } catch (e) {
-                    console.error('Error updating metadata:', e);
+            // Add song back to available list
+            try {
+                if (window.refreshAvailableSongs) {
+                    window.refreshAvailableSongs();
                 }
-
-                // Add song back to available list
-                try {
-                    if (window.refreshAvailableSongs) {
-                        window.refreshAvailableSongs();
-                    }
-                } catch (e) {
-                    console.error('Error refreshing available songs:', e);
-                }
-            } else {
-                if (button) {
-                    button.textContent = originalText;
-                    button.disabled = false;
-                }
+            } catch (e) {
+                console.error('Error refreshing available songs:', e);
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
+        } else {
             if (button) {
                 button.textContent = originalText;
                 button.disabled = false;
             }
-            alert('Error removing song. Please try again.');
-        });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        if (button) {
+            button.textContent = originalText;
+            button.disabled = false;
+        }
+        alert('Error removing song. Please try again.');
+    });
 
-        return false;
-    }
     return false;
 }
-
 // Fast metadata update for AJAX responses
 function updateSetlistMetadataFast(data) {
     const dts = document.querySelectorAll("dt");
@@ -465,12 +462,14 @@ function removeEncore(url) {
 }
 
 function addEncore(url, event) {
-    event.preventDefault();
-    event.stopPropagation();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
 
     if (confirm('Add an encore break after this song?')) {
         // Show loading state - find the dropdown toggle button
-        const dropdownItem = event.target.closest('.dropdown-item');
+        const dropdownItem = event?.target ? event.target.closest('.dropdown-item') : null;
         const dropdown = dropdownItem ? dropdownItem.parentElement : null;
         const dropdownToggle = dropdown ? dropdown.querySelector('.dropdown-toggle') : null;
         const button = dropdownToggle;
