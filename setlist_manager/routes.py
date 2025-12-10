@@ -47,15 +47,15 @@ def _format_setlist_for_timer(setlist: Setlist) -> dict:
     for entry in setlist.entries:
         if entry.song:
             song_title = entry.song.print_title
-            if entry.starts_encore and not in_encore:
-                # First encore song
+            if entry.starts_encore:
+                # First song of an encore - switch to encore mode
                 in_encore = True
                 encore_songs.append(song_title)
-            elif entry.starts_encore and in_encore:
-                # Continue encore
+            elif in_encore:
+                # We're already in encore mode, so this is part of the encore
                 encore_songs.append(song_title)
             else:
-                # Main set song
+                # Still in main set
                 main_set_songs.append(song_title)
 
     # Calculate durations
@@ -63,23 +63,23 @@ def _format_setlist_for_timer(setlist: Setlist) -> dict:
     encore_duration = 0
     in_encore = False
 
-    for entry in setlist.entries:
+    for i, entry in enumerate(setlist.entries):
         if entry.song:
             duration = entry.song.duration_seconds
-            if entry.starts_encore and not in_encore:
-                # First encore song - include encore break
-                main_set_duration += setlist.ENCORE_BREAK_SECONDS
+            if entry.starts_encore:
+                # First song of an encore - add encore break to main set
+                main_set_duration += setlist.encore_break_seconds
                 encore_duration += duration
                 in_encore = True
-            elif entry.starts_encore and in_encore:
-                # Continue encore
+            elif in_encore:
+                # We're in encore mode
                 encore_duration += duration
             else:
-                # Main set song
+                # Still in main set
                 main_set_duration += duration
-                if entry != setlist.entries[-1]:
-                    # Add transition time if not last song in main set
-                    main_set_duration += setlist.BETWEEN_SONG_SECONDS
+                # Add transition time if not last song in main set
+                if i < len(setlist.entries) - 1 and not setlist.entries[i + 1].starts_encore:
+                    main_set_duration += setlist.between_song_seconds
 
     # Format duration as hh:mm:ss
     def format_duration(seconds):
@@ -621,23 +621,48 @@ def update_show_date(setlist_id: int):
 
     if action == "clear":
         setlist.show_date = None
+        setlist.show_start_time = None
+        setlist.show_end_time = None
         db.session.commit()
-        flash("Show date cleared.", "success")
+        flash("Show date and times cleared.", "success")
         return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
     show_date_raw = (request.form.get("show_date") or "").strip()
-    if not show_date_raw:
-        flash("Select a show date or clear the existing one.", "error")
+    show_start_raw = (request.form.get("show_start_time") or "").strip()
+    show_end_raw = (request.form.get("show_end_time") or "").strip()
+
+    # Validate that at least one field is provided
+    if not show_date_raw and not show_start_raw and not show_end_raw:
+        flash("Please enter at least one field or clear all.", "error")
         return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
     try:
-        setlist.show_date = datetime.strptime(show_date_raw, "%Y-%m-%d").date()
-    except ValueError:
-        flash("Show date must be in YYYY-MM-DD format.", "error")
+        # Update show date
+        if show_date_raw:
+            setlist.show_date = datetime.strptime(show_date_raw, "%Y-%m-%d").date()
+
+        # Update show start time
+        if show_start_raw:
+            from datetime import time
+            hours, minutes = map(int, show_start_raw.split(":"))
+            setlist.show_start_time = time(hours, minutes)
+        else:
+            setlist.show_start_time = None
+
+        # Update show end time
+        if show_end_raw:
+            from datetime import time
+            hours, minutes = map(int, show_end_raw.split(":"))
+            setlist.show_end_time = time(hours, minutes)
+        else:
+            setlist.show_end_time = None
+
+    except ValueError as e:
+        flash(f"Invalid time format. Please use HH:MM format.", "error")
         return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
     db.session.commit()
-    flash("Show date updated.", "success")
+    flash("Show times updated successfully.", "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
 
@@ -1439,18 +1464,57 @@ def import_database():
 @bp.get("/settings")
 def settings():
     timer_url = Setting.get("timer_api_url", "")
-    return render_template("settings.html", timer_url=timer_url)
+    default_transition_time = Setting.get("transition_time_seconds", "30")
+    default_encore_break_time = Setting.get("encore_break_seconds", "240")
+
+    return render_template(
+        "settings.html",
+        timer_url=timer_url,
+        default_transition_time=default_transition_time,
+        default_encore_break_time=default_encore_break_time
+    )
 
 
 @bp.post("/settings")
 def update_settings():
     timer_url = request.form.get("timer_api_url", "").strip()
+    transition_time = request.form.get("default_transition_time", "30").strip()
+    encore_break_time = request.form.get("default_encore_break_time", "240").strip()
 
     if timer_url and not timer_url.startswith(("http://", "https://")):
         flash("Timer API URL must start with http:// or https://", "error")
         return render_template("settings.html", timer_url=timer_url)
 
+    try:
+        transition_time_int = int(transition_time)
+        if transition_time_int < 0 or transition_time_int > 300:
+            raise ValueError("Transition time must be between 0 and 300 seconds")
+    except ValueError as e:
+        flash(f"Invalid transition time: {str(e)}", "error")
+        return render_template(
+            "settings.html",
+            timer_url=timer_url,
+            default_transition_time=transition_time,
+            default_encore_break_time=encore_break_time
+        )
+
+    try:
+        encore_break_time_int = int(encore_break_time)
+        if encore_break_time_int < 0 or encore_break_time_int > 600:
+            raise ValueError("Encore break time must be between 0 and 600 seconds")
+    except ValueError as e:
+        flash(f"Invalid encore break time: {str(e)}", "error")
+        return render_template(
+            "settings.html",
+            timer_url=timer_url,
+            default_transition_time=transition_time,
+            default_encore_break_time=encore_break_time
+        )
+
     Setting.set("timer_api_url", timer_url, "Timer API endpoint URL")
+    Setting.set("transition_time_seconds", str(transition_time_int), "Default time between songs in seconds")
+    Setting.set("encore_break_seconds", str(encore_break_time_int), "Default break time before encore in seconds")
+
     flash("Settings saved successfully!", "success")
     return redirect(url_for("setlists.settings"))
 
