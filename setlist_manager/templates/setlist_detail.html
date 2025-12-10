@@ -345,6 +345,9 @@ document.addEventListener('click', function(event) {
 // Handle song and encore removal
 function removeSong(url) {
     if (confirm('Remove this song from the setlist?')) {
+        event.preventDefault();
+        event.stopPropagation();
+
         // Show loading state - find the dropdown toggle button
         const dropdownItem = event.target.closest('.dropdown-item');
         const dropdown = dropdownItem ? dropdownItem.parentElement : null;
@@ -375,11 +378,19 @@ function removeSong(url) {
                 }
 
                 // Update setlist metadata
-                updateSetlistMetadataFast(data);
+                try {
+                    updateSetlistMetadataFast(data);
+                } catch (e) {
+                    console.error('Error updating metadata:', e);
+                }
 
                 // Add song back to available list
-                if (window.refreshAvailableSongs) {
-                    window.refreshAvailableSongs();
+                try {
+                    if (window.refreshAvailableSongs) {
+                        window.refreshAvailableSongs();
+                    }
+                } catch (e) {
+                    console.error('Error refreshing available songs:', e);
                 }
             } else {
                 if (button) {
