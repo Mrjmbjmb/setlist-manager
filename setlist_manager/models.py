@@ -110,6 +110,9 @@ class Setlist(db.Model):
     show_date = db.Column(db.Date, nullable=True)  # Add this line
     show_start_time = db.Column(db.Time, nullable=True)
     show_end_time = db.Column(db.Time, nullable=True)
+    # Performance optimization: cached values
+    cached_song_count = db.Column(db.Integer, nullable=False, default=0)
+    cached_total_duration_seconds = db.Column(db.Integer, nullable=False, default=0)
 
     entries = db.relationship(
         "SetlistSong",
@@ -117,6 +120,12 @@ class Setlist(db.Model):
         order_by="SetlistSong.position",
         cascade="all, delete-orphan",
     )
+
+    def update_cached_values(self) -> None:
+        """Update cached performance values."""
+        self.cached_song_count = len(self.entries)
+        self.cached_total_duration_seconds = self.total_duration_seconds
+        db.session.commit()
 
     @property
     def has_encore_break(self) -> bool:
@@ -155,6 +164,23 @@ class Setlist(db.Model):
     @property
     def total_duration_seconds(self) -> int:
         return self.total_song_duration_seconds + self.transition_buffer_seconds
+
+    @property
+    def cached_song_count_value(self) -> int:
+        """Get cached song count for fast access in list views."""
+        return self.cached_song_count
+
+    @property
+    def cached_total_duration_label(self) -> str:
+        """Get cached total duration as hh:mm:ss for fast access in list views."""
+        hours = self.cached_total_duration_seconds // 3600
+        minutes = (self.cached_total_duration_seconds % 3600) // 60
+        seconds = self.cached_total_duration_seconds % 60
+
+        if hours > 0:
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            return f"{minutes}:{seconds:02d}"
 
     @property
     def total_duration_label(self) -> str:

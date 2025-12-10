@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   app:
-    image: registry.124bouchard.com/setlist-manager:1.0.0
+    image: registry.124bouchard.com/setlist-manager:1.0
     ports:
       - "8000:8000"
     volumes:

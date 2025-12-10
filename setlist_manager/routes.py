@@ -593,6 +593,9 @@ def create_setlist():
 
         db.session.commit()
 
+        # Update cached values
+        setlist.update_cached_values()
+
         flash("Setlist created successfully.", "success")
         return redirect(url_for("setlists.view_setlist", setlist_id=setlist.id))
 
@@ -856,6 +859,9 @@ def add_song_to_setlist(setlist_id: int):
     db.session.add(entry)
     db.session.commit()
 
+    # Update cached values
+    setlist.update_cached_values()
+
     # Handle AJAX response
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({
@@ -916,6 +922,9 @@ def remove_setlist_entry(setlist_id: int, entry_id: int):
     db.session.commit()
     _normalize_positions(setlist_id)
 
+    # Update cached values
+    setlist.update_cached_values()
+
     # Handle AJAX request
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({
@@ -974,6 +983,7 @@ def add_encore_break(setlist_id: int):
     if not last_entry.starts_encore:
         last_entry.starts_encore = True
         db.session.commit()
+        setlist.update_cached_values()
         flash("Encore break added to setlist.", "success")
     else:
         flash("Last song is already an encore.", "error")
@@ -994,6 +1004,7 @@ def remove_encore_break(setlist_id: int, entry_id: int):
     if entry.starts_encore:
         entry.starts_encore = False
         db.session.commit()
+        setlist.update_cached_values()
 
         # Handle AJAX request
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -1041,6 +1052,7 @@ def add_encore_break_at_position(setlist_id: int, entry_id: int):
     if not next_entry:
         target_entry.starts_encore = True
         db.session.commit()
+        setlist.update_cached_values()
 
         # Handle AJAX request
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -1054,6 +1066,7 @@ def add_encore_break_at_position(setlist_id: int, entry_id: int):
         # Make the next entry start an encore
         next_entry.starts_encore = True
         db.session.commit()
+        setlist.update_cached_values()
 
         # Handle AJAX request
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -1109,6 +1122,11 @@ def _normalize_positions(setlist_id: int) -> None:
         if entry.starts_encore and index == 1:
             entry.starts_encore = False
     db.session.commit()
+
+    # Update cached values after reordering
+    setlist = Setlist.query.get(setlist_id)
+    if setlist:
+        setlist.update_cached_values()
 
 @bp.route("/setlists/import", methods=["GET", "POST"])
 def import_setlists():

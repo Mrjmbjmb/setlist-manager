@@ -44,8 +44,8 @@
                                 —
                             {% endif %}
                         </td>
-                        <td>{{ setlist.entries|length }}</td>
-                        <td>{{ setlist.total_duration_label }}</td>
+                        <td>{{ setlist.cached_song_count_value }}</td>
+                        <td>{{ setlist.cached_total_duration_label }}</td>
                         <td>{{ setlist.target_duration_label }}</td>
                         <td>{{ setlist.created_at.strftime('%b %d, %Y') }}</td>
                         <td>
