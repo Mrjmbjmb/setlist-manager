@@ -345,25 +345,34 @@ document.addEventListener('click', function(event) {
 // Handle song and encore removal
 function removeSong(url) {
     if (confirm('Remove this song from the setlist?')) {
-        // Show loading state
-        const button = event.target.closest('button');
-        const originalText = button.textContent;
-        button.textContent = 'Removing...';
-        button.disabled = true;
+        // Show loading state - find the dropdown toggle button
+        const dropdownItem = event.target.closest('.dropdown-item');
+        const dropdown = dropdownItem ? dropdownItem.parentElement : null;
+        const dropdownToggle = dropdown ? dropdown.querySelector('.dropdown-toggle') : null;
+        const button = dropdownToggle;
+        const originalText = button ? button.textContent : '';
+
+        if (button) {
+            button.textContent = 'Removing...';
+            button.disabled = true;
+        }
 
         fetch(url, {
             method: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Content-Type': 'application/x-www-form-urlencoded'
-            }
+            },
+            body: ''
         })
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
                 // Remove the row immediately without page reload
-                const row = button.closest('tr');
-                row.remove();
+                const row = event.target.closest('tr');
+                if (row) {
+                    row.remove();
+                }
 
                 // Update setlist metadata
                 updateSetlistMetadataFast(data);
@@ -373,14 +382,18 @@ function removeSong(url) {
                     window.refreshAvailableSongs();
                 }
             } else {
-                button.textContent = originalText;
-                button.disabled = false;
+                if (button) {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            button.textContent = originalText;
-            button.disabled = false;
+            if (button) {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
             // Fallback to form submission
             window.location.href = url;
         });
@@ -413,7 +426,8 @@ function removeEncore(url) {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Content-Type': 'application/x-www-form-urlencoded'
-            }
+            },
+            body: ''
         })
         .then(response => response.json())
         .then(data => {
@@ -431,18 +445,25 @@ function removeEncore(url) {
 
 function addEncore(url) {
     if (confirm('Add an encore break after this song?')) {
-        // Show loading state
-        const button = event.target.closest('button');
-        const originalText = button.textContent;
-        button.textContent = 'Adding...';
-        button.disabled = true;
+        // Show loading state - find the dropdown toggle button
+        const dropdownItem = event.target.closest('.dropdown-item');
+        const dropdown = dropdownItem ? dropdownItem.parentElement : null;
+        const dropdownToggle = dropdown ? dropdown.querySelector('.dropdown-toggle') : null;
+        const button = dropdownToggle;
+        const originalText = button ? button.textContent : '';
+
+        if (button) {
+            button.textContent = 'Adding...';
+            button.disabled = true;
+        }
 
         fetch(url, {
             method: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Content-Type': 'application/x-www-form-urlencoded'
-            }
+            },
+            body: ''
         })
         .then(response => response.json())
         .then(data => {

@@ -927,6 +927,7 @@ def remove_setlist_entry(setlist_id: int, entry_id: int):
     if entry is None:
         abort(404)
 
+    setlist = Setlist.query.get_or_404(setlist_id)
     song_title = entry.song.title
     song_duration = entry.song.duration_seconds
     was_last = (entry.position == len(setlist.entries))
@@ -937,8 +938,8 @@ def remove_setlist_entry(setlist_id: int, entry_id: int):
 
     # Handle AJAX request
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        # Update cached values
-        setlist.update_cached_values()
+        # Use decrement for better performance when removing songs
+        setlist.decrement_cached_values(song_duration, was_last)
 
         return jsonify({
             "status": "success",
@@ -947,8 +948,8 @@ def remove_setlist_entry(setlist_id: int, entry_id: int):
             "new_duration": setlist.cached_total_duration_label
         })
     else:
-        # Use full update for non-AJAX requests
-        setlist.update_cached_values()
+        # Use decrement for better performance when removing songs
+        setlist.decrement_cached_values(song_duration, was_last)
 
     flash("Removed song from setlist.", "success")
     return redirect(url_for("setlists.view_setlist", setlist_id=setlist_id))
